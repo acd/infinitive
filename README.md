@@ -58,6 +58,39 @@ $ go get github.com/acd/infinitive
 $ go build github.com/acd/infinitive
 ```
 
+## JSON API
+
+Infinitive exposes a JSON API to retrieve and manipulate thermostat parameters.
+
+#### GET /api/zone/1/config
+
+```json
+{
+   "currentTemp": 70,
+   "currentHumidity": 50,
+   "outdoorTemp": 50,
+   "mode": "auto",
+   "fanMode": "auto",
+   "hold": true,
+   "heatSetpoint": 68,
+   "coolSetpoint": 74
+}
+```
+
+#### PUT /api/zone/1/config
+
+```json
+{
+   "mode": "auto",
+   "fanMode": "auto",
+   "hold": true,
+   "heatSetpoint": 68,
+   "coolSetpoint": 74
+}
+```
+
+Valid values for `mode` are `off`, `auto`, `heat`, and `cool`. Values for `fanMode` are `auto`, `low`, `med`, and `high`.
+
 ## Details
 #### ABCD bus
 Infinity systems use a proprietary binary protocol for data exchange between system components.  These message are sent across an RS-485 serial bus which Carrier refers to as the ABCD bus.  Most systems usually includes an air-conditioning unit or heat pump, furnace, and thermostat.  The thermostat is responsible for enumerating other components of the system and managing their operation. 
