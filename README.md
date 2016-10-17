@@ -66,7 +66,7 @@ The protocol has been reverse engineered as Carrier has not published a protocol
 * [Cocoontech's Carrier Infinity Thread](http://cocoontech.com/forums/topic/11372-carrier-infinity/)
 * [Infinitude Wiki](https://github.com/nebulous/infinitude/wiki/Infinity-Protocol-Main)
 
-Infinitude reads and writes information from the Infinity thermostat.  It also gathers data by passively observing traffic exchanged between the thermostat and other system components.
+Infinitive reads and writes information from the Infinity thermostat.  It also gathers data by passively observing traffic exchanged between the thermostat and other system components.
 
 #### Bryant Evolution
 I believe Infinitive should work with Bryant Evolution systems as they use the same ABCD bus.  Please let me know if you have success using Infinitive on a Bryant system.
