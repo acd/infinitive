@@ -15,8 +15,10 @@ func webserver(port int) {
 
 	api := r.Group("/api")
 	api.GET("/zone/1/config", func(c *gin.Context) {
-		_, cfg := getConfig()
-		c.JSON(200, cfg)
+		cfg, ok := getConfig()
+		if ok {
+			c.JSON(200, cfg)
+		}
 	})
 
 	api.PUT("/zone/1/config", func(c *gin.Context) {
