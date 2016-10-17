@@ -54,6 +54,7 @@ There is a brief delay between altering a setting and Infinitive updating the in
 If you'd like to build Infinitive from source, first confirm you have a working Go environment (I've been using release 1.7.1).  Ensure your GOPATH and GOHOME are set correctly, then:
 
 ```
+$ go get github.com/acd/infinitive
 $ go build github.com/acd/infinitive
 ```
 
