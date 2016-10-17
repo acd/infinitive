@@ -5,7 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/jiguorui/crc16"
+	"github.com/npat-efault/crc16"
 )
 
 const (
@@ -15,13 +15,18 @@ const (
 	opERROR    = uint8(0x15)
 )
 
+var crcConfig = &crc16.Conf{
+	Poly: 0x8005, BitRev: true,
+	IniVal: 0x0, FinVal: 0x0,
+	BigEnd: false,
+}
+
 type InfinityFrame struct {
 	dst     uint16
 	src     uint16
 	dataLen uint8
 	op      uint8
 	data    []byte
-	cksum   uint16
 }
 
 var writeAck = &InfinityFrame{
@@ -29,6 +34,12 @@ var writeAck = &InfinityFrame{
 	dst:  devTSTAT,
 	op:   opRESPONSE,
 	data: []byte{0x00},
+}
+
+func checksum(b []byte) []byte {
+	s := crc16.New(crcConfig)
+	s.Write(b)
+	return s.Sum(nil)
 }
 
 func (f *InfinityFrame) String() string {
@@ -65,10 +76,8 @@ func (frame *InfinityFrame) encode() []byte {
 	b.WriteByte(0)
 	b.WriteByte(frame.op)
 	b.Write(frame.data)
-	cksum := crc16.CheckSum(b.Bytes())
-	var cksumbuf [2]byte
-	binary.LittleEndian.PutUint16(cksumbuf[:], cksum)
-	b.Write(cksumbuf[:])
+	cksum := checksum(b.Bytes())
+	b.Write(cksum)
 
 	return b.Bytes()
 }
@@ -87,10 +96,8 @@ func (f *InfinityFrame) decode(buf []byte) bool {
 
 	l := len(buf) - 2
 
-	f.cksum = binary.LittleEndian.Uint16(buf[l:])
-
-	cksum := crc16.CheckSum(buf[:l])
-	if f.cksum != cksum {
+	cksum := checksum(buf[:l])
+	if !bytes.Equal(cksum, buf[l:]) {
 		return false
 	}
 
