@@ -56,6 +56,8 @@ If you'd like to build Infinitive from source, first confirm you have a working 
 ```
 $ go get github.com/acd/infinitive
 $ go build github.com/acd/infinitive
+or
+$ go install github.com/acd/infinitive
 ```
 
 ## JSON API
@@ -70,10 +72,12 @@ Infinitive exposes a JSON API to retrieve and manipulate thermostat parameters.
    "currentHumidity": 50,
    "outdoorTemp": 50,
    "mode": "auto",
+   "stage":2,
    "fanMode": "auto",
    "hold": true,
    "heatSetpoint": 68,
-   "coolSetpoint": 74
+   "coolSetpoint": 74,
+   "rawMode": 64
 }
 ```
 
@@ -90,6 +94,25 @@ Infinitive exposes a JSON API to retrieve and manipulate thermostat parameters.
 ```
 
 Valid values for `mode` are `off`, `auto`, `heat`, and `cool`. Values for `fanMode` are `auto`, `low`, `med`, and `high`.
+
+#### GET /api/zone/1/fancoil
+
+```json
+{
+	"blowerRPM":0,
+	"airFlowCFM":0
+}
+```
+
+#### GET /api/zone/1/heatpump
+
+```json
+{
+	"coilTemp":19.125,
+	"outsideTemp":18.5625
+}
+```
+
 
 ## Details
 #### ABCD bus
