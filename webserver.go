@@ -21,6 +21,20 @@ func webserver(port int) {
 		}
 	})
 
+	api.GET("/zone/1/fancoil", func(c *gin.Context) {
+		fc, ok := getFanCoil()
+		if ok {
+			c.JSON(200, fc)
+		}
+	})
+
+	api.GET("/zone/1/heatpump", func(c *gin.Context) {
+		hp, ok := getHeatPump()
+		if ok {
+			c.JSON(200, hp)
+		}
+	})
+
 	api.PUT("/zone/1/config", func(c *gin.Context) {
 		var args TStatZoneConfig
 

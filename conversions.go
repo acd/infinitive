@@ -3,11 +3,16 @@ package main
 func rawModeToString(mode uint8) string {
 	switch mode {
 	case 0:
-		return "heat"
+		return "heat"		// heat source: "system in control"
 	case 1:
 		return "cool"
 	case 2:
 		return "auto"
+	case 3:
+		return "electric"	// electric heat only - fan coil system
+							// on a furnace system perhaps this is furnace only - untested
+	case 4:
+		return "heatpump"	// heat pump only
 	case 5:
 		return "off"
 	default:
