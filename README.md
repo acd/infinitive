@@ -71,7 +71,7 @@ Infinitive exposes a JSON API to retrieve and manipulate thermostat parameters.
    "currentTemp": 70,
    "currentHumidity": 50,
    "outdoorTemp": 50,
-   "mode": "auto",
+   "mode": "heat",
    "stage":2,
    "fanMode": "auto",
    "hold": true,
@@ -80,6 +80,7 @@ Infinitive exposes a JSON API to retrieve and manipulate thermostat parameters.
    "rawMode": 64
 }
 ```
+rawMode included for debugging purposes. It encodes stage and mode. 
 
 #### PUT /api/zone/1/config
 
@@ -108,8 +109,8 @@ Valid values for `mode` are `off`, `auto`, `heat`, and `cool`. Values for `fanMo
 
 ```json
 {
-	"coilTemp":19.125,
-	"outsideTemp":18.5625
+	"coilTemp":19,
+	"outsideTemp":18
 }
 ```
 
