@@ -30,16 +30,28 @@ type AirHandlerBlower struct {
 
 type AirHandlerDuct struct {
 	AirFlowCFM uint16 `json:"airFlowCFM"`
+	ElecHeat bool `json:"elecHeat"`
 }
 
 type AirHandlerData struct {
 	BlowerRPM uint16 `json:"blowerRPM"`
 	AirFlowCFM uint16 `json:"airFlowCFM"`
+	ElecHeat bool `json:"elecHeat"`
 }
 
 type HeatPump struct {
 	CoilTemp float32 `json:"coilTemp"`
 	OutsideTemp float32 `json:"outsideTemp"`
+}
+
+type HeatPumpStage struct {
+	Stage uint8 `json:"stage"`
+}
+
+type HeatPumpData struct {
+	CoilTemp float32 `json:"coilTemp"`
+	OutsideTemp float32 `json:"outsideTemp"`
+	Stage uint8 `json:"stage"`
 }
 
 var infinity *InfinityProtocol
@@ -88,19 +100,30 @@ func getFanCoil() (*AirHandlerData, bool) {
 	}
 	
 	return &AirHandlerData{
-		BlowerRPM:     tb.BlowerRPM,
-		AirFlowCFM: td.AirFlowCFM,
+		BlowerRPM:     	tb.BlowerRPM,
+		AirFlowCFM: 	td.AirFlowCFM,
+		ElecHeat: 		td.ElecHeat,
 	}, true
 }
 
-func getHeatPump() (*HeatPump, bool) {
+func getHeatPump() (*HeatPumpData, bool) {
 	p := cache.get("heatpump")
 	tp, ok := p.(*HeatPump)
 	if !ok {
 		return nil, false
 	}
 	
-	return tp, true
+	s := cache.get("heatpumpstage")
+	ts, ok := s.(*HeatPumpStage)
+	if !ok {
+		return nil, false
+	}
+		
+	return &HeatPumpData {
+		CoilTemp: tp.CoilTemp,
+		OutsideTemp: tp.OutsideTemp,
+		Stage: ts.Stage,
+	}, true
 }
 
 func statePoller() {
@@ -123,11 +146,14 @@ func attachSnoops() {
 			coilTemp := float32(binary.BigEndian.Uint16(data[2:4])) / float32(16)
 			outsideTemp := float32(binary.BigEndian.Uint16(data[0:2])) / float32(16)
 			cache.update("heatpump", &HeatPump{	CoilTemp: coilTemp,
-												OutsideTemp: outsideTemp,
-			})
+												OutsideTemp: outsideTemp})
 
-			log.Printf("heat pump coil temp is: %f", coilTemp)
-			log.Printf("heat pump outside temp is: %f", outsideTemp)
+			log.Debugf("heat pump coil temp is: %f", coilTemp)
+			log.Debugf("heat pump outside temp is: %f", outsideTemp)
+		} else if bytes.Equal(frame.data[0:3], []byte{0x00, 0x3e, 0x02}) {
+			stage := data[0] >> 1
+			log.Debugf("HP stage is: %d", stage)
+			cache.update("heatpumpstage", &HeatPumpStage{ Stage: stage })
 		}
 
 	})
@@ -142,10 +168,13 @@ func attachSnoops() {
 			cache.update("blower", &AirHandlerBlower{BlowerRPM: blowerRPM})
 		} else if bytes.Equal(frame.data[0:3], []byte{0x00, 0x03, 0x16}) {
 			airFlowCFM := binary.BigEndian.Uint16(data[4:8])
+			elecHeat := data[0] & 0x03 != 0
 			log.Debugf("air flow CFM is: %d", airFlowCFM)
-			cache.update("duct", &AirHandlerDuct{AirFlowCFM: airFlowCFM})
+			cache.update("duct", &AirHandlerDuct{	AirFlowCFM: airFlowCFM,
+													ElecHeat: elecHeat })
 		}
 	})
+	
 }
 
 func main() {
