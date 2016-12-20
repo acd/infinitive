@@ -21,8 +21,8 @@ func webserver(port int) {
 		}
 	})
 
-	api.GET("/zone/1/fancoil", func(c *gin.Context) {
-		fc, ok := getFanCoil()
+	api.GET("/zone/1/airhandler", func(c *gin.Context) {
+		fc, ok := getAirHandler()
 		if ok {
 			c.JSON(200, fc)
 		}

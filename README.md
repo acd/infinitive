@@ -56,8 +56,6 @@ If you'd like to build Infinitive from source, first confirm you have a working 
 ```
 $ go get github.com/acd/infinitive
 $ go build github.com/acd/infinitive
-or
-$ go install github.com/acd/infinitive
 ```
 
 ## JSON API
@@ -94,14 +92,17 @@ rawMode included for debugging purposes. It encodes stage and mode.
 }
 ```
 
-Valid values for `mode` are `off`, `auto`, `heat`, and `cool`. Values for `fanMode` are `auto`, `low`, `med`, and `high`.
+Valid write values for `mode` are `off`, `auto`, `heat`, and `cool`.
+Additional read values for mode are `electric` and `heatpump` indicating "heat pump only" or "electric heat only" have been selected at the thermostat 
+Values for `fanMode` are `auto`, `low`, `med`, and `high`.
 
-#### GET /api/zone/1/fancoil
+#### GET /api/zone/1/airhandler
 
 ```json
 {
 	"blowerRPM":0,
-	"airFlowCFM":0
+	"airFlowCFM":0,
+	"elecHeat":False
 }
 ```
 
@@ -109,8 +110,9 @@ Valid values for `mode` are `off`, `auto`, `heat`, and `cool`. Values for `fanMo
 
 ```json
 {
-	"coilTemp":19,
-	"outsideTemp":18
+	"coilTemp":28.8125,
+	"outsideTemp":31.375,
+	"stage":2
 }
 ```
 
