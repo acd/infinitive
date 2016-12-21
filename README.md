@@ -57,11 +57,16 @@ If you'd like to build Infinitive from source, first confirm you have a working 
 $ go get github.com/acd/infinitive
 $ go build github.com/acd/infinitive
 ```
-Note: If you make changes to the code or other resources in the assets directory you will need to rebuild the bindata_assetfs.go file. You will need the go-bindata-assetfs utility. 
+Note: If you make changes to the code or other resources in the assets directory you will need to rebuild the bindata_assetfs.go file. You will need the go-bindata-assetfs utility.
+ 
 1. Install go-bindata-assetfs into your go folders
+
 Details, and installation instructions are available here.
+
 https://github.com/elazarl/go-bindata-assetfs
+
 2. Rebuild bindata_assetfs.go
+
 From within the infinitive folder execute
 ```
 $ go-bindata-assetfs assets/...
