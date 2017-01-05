@@ -11,12 +11,12 @@ import (
 )
 
 type APIVacationConfig struct {
-        Days           *uint8  `json:"days"`
-        MinTemperature *uint8  `json:"minTemperature"`
-        MaxTemperature *uint8  `json:"maxTemperature"`
-        MinHumidity    *uint8  `json:"minHumidity"`
-        MaxHumidity    *uint8  `json:"maxHumidity"`
-        FanMode        *string `json:"fanMode"`
+	Days           *uint8  `json:"days"`
+	MinTemperature *uint8  `json:"minTemperature"`
+	MaxTemperature *uint8  `json:"maxTemperature"`
+	MinHumidity    *uint8  `json:"minHumidity"`
+	MaxHumidity    *uint8  `json:"maxHumidity"`
+	FanMode        *string `json:"fanMode"`
 }
 
 func webserver(port int) {
@@ -50,8 +50,8 @@ func webserver(port int) {
 		flags := byte(0)
 
 		if args.Days != nil {
-		params.Hours = uint16(*args.Days) * uint16(24)
-		flags |= 0x02
+			params.Hours = uint16(*args.Days) * uint16(24)
+			flags |= 0x02
 		}
 
 		if args.MinTemperature != nil {
