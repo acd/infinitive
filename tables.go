@@ -1,8 +1,9 @@
 package main
 
-// Table locations
-var tTSTAT_CURRENT_PARAMS = []byte{0x00, 0x3B, 0x02}
-var tTSTAT_ZONE_PARAMS = []byte{0x00, 0x3B, 0x03}
+type InfinityTableAddr [3]byte
+type InfinityTable interface {
+	addr() InfinityTableAddr
+}
 
 type TStatCurrentParams struct {
 	Z1CurrentTemp     uint8
@@ -27,6 +28,10 @@ type TStatCurrentParams struct {
 	Mode              uint8
 	Unknown2          [5]uint8
 	DisplayedZone     uint8
+}
+
+func (params TStatCurrentParams) addr() InfinityTableAddr {
+	return InfinityTableAddr{0x00, 0x3B, 0x02}
 }
 
 type TStatZoneParams struct {
@@ -81,4 +86,22 @@ type TStatZoneParams struct {
 	Z6Name           [12]byte
 	Z7Name           [12]byte
 	Z8Name           [12]byte
+}
+
+func (params TStatZoneParams) addr() InfinityTableAddr {
+	return InfinityTableAddr{0x00, 0x3B, 0x03}
+}
+
+type TStatVacationParams struct {
+	Active         uint8
+	Hours          uint16
+	MinTemperature uint8
+	MaxTemperature uint8
+	MinHumidity    uint8
+	MaxHumidity    uint8
+	FanMode        uint8 // matches fan mode from TStatZoneParams
+}
+
+func (params TStatVacationParams) addr() InfinityTableAddr {
+	return InfinityTableAddr{0x00, 0x3B, 0x04}
 }
