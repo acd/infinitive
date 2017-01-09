@@ -91,6 +91,35 @@ Infinitive exposes a JSON API to retrieve and manipulate thermostat parameters.
 
 Valid values for `mode` are `off`, `auto`, `heat`, and `cool`. Values for `fanMode` are `auto`, `low`, `med`, and `high`.
 
+#### GET /api/zone/1/vacation
+
+```
+{
+   "active":false,
+   "days":0,
+   "minTemperature":56,
+   "maxTemperature":84,
+   "minHumidity":15,
+   "maxHumidity":60,
+   "fanMode":"auto"
+}
+```
+
+#### PUT /api/zone/1/vacation
+
+```
+{
+   "days":0,
+   "minTemperature":56,
+   "maxTemperature":84,
+   "minHumidity":15,
+   "maxHumidity":60,
+   "fanMode":"auto"
+}
+```
+
+All parameters are optional.  A single parameter may be updated by sending a JSON document containing only that parameter.  Vacation mode is disabled by setting `days` to `0`.  Valid values for `fanMode` are `auto`, `low`, `med`, and `high`.
+
 ## Details
 #### ABCD bus
 Infinity systems use a proprietary binary protocol for data exchange between system components.  These message are sent across an RS-485 serial bus which Carrier refers to as the ABCD bus.  Most systems usually includes an air-conditioning unit or heat pump, furnace, and thermostat.  The thermostat is responsible for enumerating other components of the system and managing their operation. 
