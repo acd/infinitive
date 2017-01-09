@@ -21,6 +21,28 @@ func webserver(port int) {
 		}
 	})
 
+	api.GET("/zone/1/vacation", func(c *gin.Context) {
+		vac := TStatVacationParams{}
+		ok := infinity.ReadTable(devTSTAT, &vac)
+		if ok {
+			c.JSON(200, vac.toAPI())
+		}
+	})
+
+	api.PUT("/zone/1/vacation", func(c *gin.Context) {
+		var args APIVacationConfig
+
+		if c.Bind(&args) != nil {
+			log.Printf("bind failed")
+			return
+		}
+
+		params := TStatVacationParams{}
+		flags := params.fromAPI(&args)
+
+		infinity.WriteTable(devTSTAT, params, flags)
+	})
+
 	api.PUT("/zone/1/config", func(c *gin.Context) {
 		var args TStatZoneConfig
 
@@ -29,7 +51,9 @@ func webserver(port int) {
 			flags := byte(0)
 
 			if len(args.FanMode) > 0 {
-				params.Z1FanMode = stringFanModeToRaw(args.FanMode)
+				mode, _ := stringFanModeToRaw(args.FanMode)
+				// FIXME: check for ok here
+				params.Z1FanMode = mode
 				flags |= 0x01
 			}
 
@@ -54,12 +78,12 @@ func webserver(port int) {
 
 			if flags != 0 {
 				log.Printf("calling doWrite with flags: %x", flags)
-				infinity.Write(devTSTAT, tTSTAT_ZONE_PARAMS, []byte{0x00, 0x00, flags}, params)
+				infinity.WriteTable(devTSTAT, params, flags)
 			}
 
 			if len(args.Mode) > 0 {
 				p := TStatCurrentParams{Mode: stringModeToRaw(args.Mode)}
-				infinity.Write(devTSTAT, tTSTAT_CURRENT_PARAMS, []byte{0x00, 0x00, 0x10}, p)
+				infinity.WriteTable(devTSTAT, p, 0x10)
 			}
 		} else {
 			log.Printf("bind failed")
