@@ -105,3 +105,69 @@ type TStatVacationParams struct {
 func (params TStatVacationParams) addr() InfinityTableAddr {
 	return InfinityTableAddr{0x00, 0x3B, 0x04}
 }
+
+type APIVacationConfig struct {
+	Active         *bool   `json:"active"`
+	Days           *uint8  `json:"days"`
+	MinTemperature *uint8  `json:"minTemperature"`
+	MaxTemperature *uint8  `json:"maxTemperature"`
+	MinHumidity    *uint8  `json:"minHumidity"`
+	MaxHumidity    *uint8  `json:"maxHumidity"`
+	FanMode        *string `json:"fanMode"`
+}
+
+func (params TStatVacationParams) toAPI() APIVacationConfig {
+	api := APIVacationConfig{MinTemperature: &params.MinTemperature,
+		MaxTemperature: &params.MaxTemperature,
+		MinHumidity:    &params.MinHumidity,
+		MaxHumidity:    &params.MaxHumidity}
+
+	active := bool(params.Active == 1)
+	api.Active = &active
+
+	days := uint8(params.Hours / 7)
+	api.Days = &days
+
+	mode := rawFanModeToString(params.FanMode)
+	api.FanMode = &mode
+
+	return api
+}
+
+func (params *TStatVacationParams) fromAPI(config *APIVacationConfig) byte {
+	flags := byte(0)
+
+	if config.Days != nil {
+		params.Hours = uint16(*config.Days) * uint16(24)
+		flags |= 0x02
+	}
+
+	if config.MinTemperature != nil {
+		params.MinTemperature = *config.MinTemperature
+		flags |= 0x04
+	}
+
+	if config.MaxTemperature != nil {
+		params.MaxTemperature = *config.MaxTemperature
+		flags |= 0x08
+	}
+
+	if config.MinHumidity != nil {
+		params.MinHumidity = *config.MinHumidity
+		flags |= 0x10
+	}
+
+	if config.MaxHumidity != nil {
+		params.MaxHumidity = *config.MaxHumidity
+		flags |= 0x20
+	}
+
+	if config.FanMode != nil {
+		mode, _ := stringFanModeToRaw(*config.FanMode)
+		// FIXME: check for ok here
+		params.FanMode = mode
+		flags |= 0x40
+	}
+
+	return flags
+}

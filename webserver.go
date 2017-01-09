@@ -10,15 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type APIVacationConfig struct {
-	Days           *uint8  `json:"days"`
-	MinTemperature *uint8  `json:"minTemperature"`
-	MaxTemperature *uint8  `json:"maxTemperature"`
-	MinHumidity    *uint8  `json:"minHumidity"`
-	MaxHumidity    *uint8  `json:"maxHumidity"`
-	FanMode        *string `json:"fanMode"`
-}
-
 func webserver(port int) {
 	r := gin.Default()
 
@@ -34,7 +25,7 @@ func webserver(port int) {
 		vac := TStatVacationParams{}
 		ok := infinity.ReadTable(devTSTAT, &vac)
 		if ok {
-			c.JSON(200, vac)
+			c.JSON(200, vac.toAPI())
 		}
 	})
 
@@ -47,39 +38,7 @@ func webserver(port int) {
 		}
 
 		params := TStatVacationParams{}
-		flags := byte(0)
-
-		if args.Days != nil {
-			params.Hours = uint16(*args.Days) * uint16(24)
-			flags |= 0x02
-		}
-
-		if args.MinTemperature != nil {
-			params.MinTemperature = *args.MinTemperature
-			flags |= 0x04
-		}
-
-		if args.MaxTemperature != nil {
-			params.MaxTemperature = *args.MaxTemperature
-			flags |= 0x08
-		}
-
-		if args.MinHumidity != nil {
-			params.MinHumidity = *args.MinHumidity
-			flags |= 0x10
-		}
-
-		if args.MaxHumidity != nil {
-			params.MaxHumidity = *args.MaxHumidity
-			flags |= 0x20
-		}
-
-		if args.FanMode != nil {
-			mode, _ := stringFanModeToRaw(*args.FanMode)
-			// FIXME: check for ok here
-			params.FanMode = mode
-			flags |= 0x40
-		}
+		flags := params.fromAPI(&args)
 
 		infinity.WriteTable(devTSTAT, params, flags)
 	})
