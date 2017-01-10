@@ -17,11 +17,11 @@ Download the Infinitive release appropriate for your architecture.
 
    * amd64:
 ```
-$ wget -O infinitive https://github.com/acd/infinitive/releases/download/v0.1/infinitive.amd64
+$ wget -O infinitive https://github.com/acd/infinitive/releases/download/v0.2/infinitive.amd64
 ```
    * arm:
 ```
-$ wget -O infinitive https://github.com/acd/infinitive/releases/download/v0.1/infinitive.arm
+$ wget -O infinitive https://github.com/acd/infinitive/releases/download/v0.2/infinitive.arm
 ```
 
 Start Infinitive, providing the HTTP port to listen on for the management interface and the path to the correct serial device.
