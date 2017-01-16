@@ -50,17 +50,17 @@ func rawFanModeToString(mode uint8) string {
 	}
 }
 
-func stringFanModeToRaw(mode string) uint8 {
+func stringFanModeToRaw(mode string) (uint8, bool) {
 	switch mode {
 	case "auto":
-		return 0
+		return 0, true
 	case "low":
-		return 1
+		return 1, true
 	case "med":
-		return 2
+		return 2, true
 	case "high":
-		return 3
+		return 3, true
 	default:
-		return 0
+		return 0, false
 	}
 }

@@ -42,13 +42,13 @@ var heatPump *HeatPump
 
 func getConfig() (*TStatZoneConfig, bool) {
 	cfg := TStatZoneParams{}
-	ok := infinity.Read(devTSTAT, tTSTAT_ZONE_PARAMS, &cfg)
+	ok := infinity.ReadTable(devTSTAT, &cfg)
 	if !ok {
 		return nil, false
 	}
 
 	params := TStatCurrentParams{}
-	ok = infinity.Read(devTSTAT, tTSTAT_CURRENT_PARAMS, &params)
+	ok = infinity.ReadTable(devTSTAT, &params)
 	if !ok {
 		return nil, false
 	}

@@ -217,17 +217,28 @@ func (p *InfinityProtocol) send(dst uint16, op uint8, requestData []byte, respon
 	return ok
 }
 
-func (p *InfinityProtocol) Write(dst uint16, table []byte, offset []byte, params interface{}) bool {
+func (p *InfinityProtocol) Write(dst uint16, table []byte, addr []byte, params interface{}) bool {
 	buf := new(bytes.Buffer)
 	buf.Write(table[:])
-	buf.Write(offset[:])
+	buf.Write(addr[:])
 	binary.Write(buf, binary.BigEndian, params)
 
 	return p.send(dst, opWRITE, buf.Bytes(), nil)
 }
 
-func (p *InfinityProtocol) Read(dst uint16, table []byte, params interface{}) bool {
-	return p.send(dst, opREAD, table, params)
+func (p *InfinityProtocol) WriteTable(dst uint16, table InfinityTable, flags uint8) bool {
+	addr := table.addr()
+	fl := []byte{0x00, 0x00, flags}
+	return p.Write(dst, addr[:], fl, table)
+}
+
+func (p *InfinityProtocol) Read(dst uint16, addr InfinityTableAddr, params interface{}) bool {
+	return p.send(dst, opREAD, addr[:], params)
+}
+
+func (p *InfinityProtocol) ReadTable(dst uint16, table InfinityTable) bool {
+	addr := table.addr()
+	return p.send(dst, opREAD, addr[:], table)
 }
 
 func (p *InfinityProtocol) sendFrame(buf []byte) bool {

@@ -17,11 +17,11 @@ Download the Infinitive release appropriate for your architecture.
 
    * amd64:
 ```
-$ wget -O infinitive https://github.com/acd/infinitive/releases/download/v0.1/infinitive.amd64
+$ wget -O infinitive https://github.com/acd/infinitive/releases/download/v0.2/infinitive.amd64
 ```
    * arm:
 ```
-$ wget -O infinitive https://github.com/acd/infinitive/releases/download/v0.1/infinitive.arm
+$ wget -O infinitive https://github.com/acd/infinitive/releases/download/v0.2/infinitive.arm
 ```
 
 Start Infinitive, providing the HTTP port to listen on for the management interface and the path to the correct serial device.
@@ -131,6 +131,35 @@ Values for `fanMode` are `auto`, `low`, `med`, and `high`.
 }
 ```
 
+
+#### GET /api/zone/1/vacation
+
+```
+{
+   "active":false,
+   "days":0,
+   "minTemperature":56,
+   "maxTemperature":84,
+   "minHumidity":15,
+   "maxHumidity":60,
+   "fanMode":"auto"
+}
+```
+
+#### PUT /api/zone/1/vacation
+
+```
+{
+   "days":0,
+   "minTemperature":56,
+   "maxTemperature":84,
+   "minHumidity":15,
+   "maxHumidity":60,
+   "fanMode":"auto"
+}
+```
+
+All parameters are optional.  A single parameter may be updated by sending a JSON document containing only that parameter.  Vacation mode is disabled by setting `days` to `0`.  Valid values for `fanMode` are `auto`, `low`, `med`, and `high`.
 
 ## Details
 #### ABCD bus
