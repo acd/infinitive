@@ -21,11 +21,10 @@ func webserver(port int) {
 		}
 	})
 
-
 	api.GET("/zone/1/airhandler", func(c *gin.Context) {
-		fc, ok := getAirHandler()
+		ah, ok := getAirHandler()
 		if ok {
-			c.JSON(200, fc)
+			c.JSON(200, ah)
 		}
 	})
 
@@ -34,6 +33,7 @@ func webserver(port int) {
 		if ok {
 			c.JSON(200, hp)
 		}
+	})
 
 	api.GET("/zone/1/vacation", func(c *gin.Context) {
 		vac := TStatVacationParams{}
