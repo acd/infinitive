@@ -21,9 +21,10 @@
           </div>
 	</div>
 	<div class="row row-centered">
-           <h5>Mode 
-              <span class="text-primary" ng-show="tstat.coolActive == true">(Cool Active)</span>
-              <span class="text-danger" ng-show="tstat.heatActive == true">(Heat Active)</span>
+           <h5>Mode: 
+              <span class="text-primary" ng-show="tstat.stage == 1">(HP Stage 1)</span>
+              <span class="text-primary" ng-show="tstat.stage == 2">(HP Stage 2)</span>
+              <span class="text-danger" ng-show="tstat.stage > 2">(Electric Heat Active)</span>              
            </h5>
           <div class="btn-group" role="group">
             <a role="button" class="btn btn-default btm-xs" ng-disabled="tstat.mode == 'off'"

@@ -33,6 +33,20 @@ func webserver(port int) {
 		}
 	})
 
+	api.GET("/zone/1/airhandler", func(c *gin.Context) {
+		ah, ok := getAirHandler()
+		if ok {
+			c.JSON(200, ah)
+		}
+	})
+
+	api.GET("/zone/1/heatpump", func(c *gin.Context) {
+		hp, ok := getHeatPump()
+		if ok {
+			c.JSON(200, hp)
+		}
+	})
+
 	api.GET("/zone/1/vacation", func(c *gin.Context) {
 		vac := TStatVacationParams{}
 		ok := infinity.ReadTable(devTSTAT, &vac)
@@ -53,6 +67,7 @@ func webserver(port int) {
 		flags := params.fromAPI(&args)
 
 		infinity.WriteTable(devTSTAT, params, flags)
+
 	})
 
 	api.PUT("/zone/1/config", func(c *gin.Context) {

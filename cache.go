@@ -21,6 +21,13 @@ func (c Cache) update(name string, data interface{}) {
 	}
 }
 
+func (c Cache) get(name string) interface{} {
+	mutex.Lock()
+	defer mutex.Unlock()
+
+	return c[name]
+}
+
 func (c Cache) dump() Cache {
 	mutex.Lock()
 	defer mutex.Unlock()

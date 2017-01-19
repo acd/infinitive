@@ -16,20 +16,24 @@ type TStatZoneConfig struct {
 	CurrentHumidity uint8  `json:"currentHumidity"`
 	OutdoorTemp     uint8  `json:"outdoorTemp"`
 	Mode            string `json:"mode"`
-	CoolActive      bool   `json:"coolActive"`
-	HeatActive      bool   `json:"heatActive"`
+	Stage           uint8  `json:"stage"`
 	FanMode         string `json:"fanMode"`
 	Hold            *bool  `json:"hold"`
 	HeatSetpoint    uint8  `json:"heatSetpoint"`
 	CoolSetpoint    uint8  `json:"coolSetpoint"`
+	RawMode         uint8  `json:"rawMode"`
 }
 
-type AirHandlerBlower struct {
-	BlowerRPM uint16 `json:"blowerRPM"`
-}
-
-type AirHandlerDuct struct {
+type AirHandler struct {
+	BlowerRPM  uint16 `json:"blowerRPM"`
 	AirFlowCFM uint16 `json:"airFlowCFM"`
+	ElecHeat   bool   `json:"elecHeat"`
+}
+
+type HeatPump struct {
+	CoilTemp    float32 `json:"coilTemp"`
+	OutsideTemp float32 `json:"outsideTemp"`
+	Stage       uint8   `json:"stage"`
 }
 
 var infinity *InfinityProtocol
@@ -55,16 +59,31 @@ func getConfig() (*TStatZoneConfig, bool) {
 		CurrentHumidity: params.Z1CurrentHumidity,
 		OutdoorTemp:     params.OutdoorAirTemp,
 		Mode:            rawModeToString(params.Mode & 0xf),
-		/* I thought the active modes were bits in the mode field but that doesn't seem to be correct.
-		      Those bits may indicate stage instead...
-		   		CoolActive:      (params.Mode&0x40 != 0),
-		   		HeatActive:      (params.Mode&0x20 != 0),
-		*/
-		FanMode:      rawFanModeToString(cfg.Z1FanMode),
-		Hold:         hold,
-		HeatSetpoint: cfg.Z1HeatSetpoint,
-		CoolSetpoint: cfg.Z1CoolSetpoint,
+		Stage:           params.Mode >> 5,
+		FanMode:         rawFanModeToString(cfg.Z1FanMode),
+		Hold:            hold,
+		HeatSetpoint:    cfg.Z1HeatSetpoint,
+		CoolSetpoint:    cfg.Z1CoolSetpoint,
+		RawMode:         params.Mode,
 	}, true
+}
+
+func getAirHandler() (AirHandler, bool) {
+	b := cache.get("blower")
+	tb, ok := b.(*AirHandler)
+	if !ok {
+		return AirHandler{}, false
+	}
+	return *tb, true
+}
+
+func getHeatPump() (HeatPump, bool) {
+	h := cache.get("heatpump")
+	th, ok := h.(*HeatPump)
+	if !ok {
+		return HeatPump{}, false
+	}
+	return *th, true
 }
 
 func statePoller() {
@@ -82,31 +101,40 @@ func attachSnoops() {
 	// Snoop Heat Pump responses
 	infinity.snoopResponse(0x5000, 0x51ff, func(frame *InfinityFrame) {
 		data := frame.data[3:]
-
-		if bytes.Equal(frame.data[0:3], []byte{0x00, 0x3e, 0x01}) {
-			coilTemp := float32(binary.BigEndian.Uint16(data[2:4])) / float32(16)
-			outsideTemp := float32(binary.BigEndian.Uint16(data[0:2])) / float32(16)
-
-			log.Printf("heat pump coil temp is: %f", coilTemp)
-			log.Printf("heat pump outside temp is: %f", outsideTemp)
+		heatPump, ok := getHeatPump()
+		if ok {
+			if bytes.Equal(frame.data[0:3], []byte{0x00, 0x3e, 0x01}) {
+				heatPump.CoilTemp = float32(binary.BigEndian.Uint16(data[2:4])) / float32(16)
+				heatPump.OutsideTemp = float32(binary.BigEndian.Uint16(data[0:2])) / float32(16)
+				log.Debugf("heat pump coil temp is: %f", heatPump.CoilTemp)
+				log.Debugf("heat pump outside temp is: %f", heatPump.OutsideTemp)
+				cache.update("heatpump", &heatPump)
+			} else if bytes.Equal(frame.data[0:3], []byte{0x00, 0x3e, 0x02}) {
+				heatPump.Stage = data[0] >> 1
+				log.Debugf("HP stage is: %d", heatPump.Stage)
+				cache.update("heatpump", &heatPump)
+			}
 		}
-
 	})
 
 	// Snoop Air Handler responses
-	infinity.snoopResponse(0x4000, 0x41ff, func(frame *InfinityFrame) {
+	infinity.snoopResponse(0x4000, 0x42ff, func(frame *InfinityFrame) {
 		data := frame.data[3:]
-
-		if bytes.Equal(frame.data[0:3], []byte{0x00, 0x03, 0x06}) {
-			blowerRPM := binary.BigEndian.Uint16(data[1:5])
-			log.Debugf("blower RPM is: %d", blowerRPM)
-			cache.update("blower", &AirHandlerBlower{BlowerRPM: blowerRPM})
-		} else if bytes.Equal(frame.data[0:3], []byte{0x00, 0x03, 0x16}) {
-			airFlowCFM := binary.BigEndian.Uint16(data[4:8])
-			log.Debugf("air flow CFM is: %d", airFlowCFM)
-			cache.update("duct", &AirHandlerDuct{AirFlowCFM: airFlowCFM})
+		airHandler, ok := getAirHandler()
+		if ok {
+			if bytes.Equal(frame.data[0:3], []byte{0x00, 0x03, 0x06}) {
+				airHandler.BlowerRPM = binary.BigEndian.Uint16(data[1:5])
+				log.Debugf("blower RPM is: %d", airHandler.BlowerRPM)
+				cache.update("blower", &airHandler)
+			} else if bytes.Equal(frame.data[0:3], []byte{0x00, 0x03, 0x16}) {
+				airHandler.AirFlowCFM = binary.BigEndian.Uint16(data[4:8])
+				airHandler.ElecHeat = data[0]&0x03 != 0
+				log.Debugf("air flow CFM is: %d", airHandler.AirFlowCFM)
+				cache.update("blower", &airHandler)
+			}
 		}
 	})
+
 }
 
 func main() {
@@ -124,6 +152,10 @@ func main() {
 	log.SetLevel(log.DebugLevel)
 
 	infinity = &InfinityProtocol{device: *serialPort}
+	airHandler := new(AirHandler)
+	heatPump := new(HeatPump)
+	cache.update("blower", airHandler)
+	cache.update("heatpump", heatPump)
 	attachSnoops()
 	err := infinity.Open()
 	if err != nil {

@@ -57,6 +57,21 @@ If you'd like to build Infinitive from source, first confirm you have a working 
 $ go get github.com/acd/infinitive
 $ go build github.com/acd/infinitive
 ```
+Note: If you make changes to the code or other resources in the assets directory you will need to rebuild the bindata_assetfs.go file. You will need the go-bindata-assetfs utility.
+ 
+1. Install go-bindata-assetfs into your go folders
+
+Details, and installation instructions are available here.
+
+https://github.com/elazarl/go-bindata-assetfs
+
+2. Rebuild bindata_assetfs.go
+
+From within the infinitive folder execute
+```
+$ go-bindata-assetfs assets/...
+```
+
 
 ## JSON API
 
@@ -69,13 +84,16 @@ Infinitive exposes a JSON API to retrieve and manipulate thermostat parameters.
    "currentTemp": 70,
    "currentHumidity": 50,
    "outdoorTemp": 50,
-   "mode": "auto",
+   "mode": "heat",
+   "stage":2,
    "fanMode": "auto",
    "hold": true,
    "heatSetpoint": 68,
-   "coolSetpoint": 74
+   "coolSetpoint": 74,
+   "rawMode": 64
 }
 ```
+rawMode included for debugging purposes. It encodes stage and mode. 
 
 #### PUT /api/zone/1/config
 
@@ -89,7 +107,30 @@ Infinitive exposes a JSON API to retrieve and manipulate thermostat parameters.
 }
 ```
 
-Valid values for `mode` are `off`, `auto`, `heat`, and `cool`. Values for `fanMode` are `auto`, `low`, `med`, and `high`.
+Valid write values for `mode` are `off`, `auto`, `heat`, and `cool`.
+Additional read values for mode are `electric` and `heatpump` indicating "heat pump only" or "electric heat only" have been selected at the thermostat 
+Values for `fanMode` are `auto`, `low`, `med`, and `high`.
+
+#### GET /api/zone/1/airhandler
+
+```json
+{
+	"blowerRPM":0,
+	"airFlowCFM":0,
+	"elecHeat":false
+}
+```
+
+#### GET /api/zone/1/heatpump
+
+```json
+{
+	"coilTemp":28.8125,
+	"outsideTemp":31.375,
+	"stage":2
+}
+```
+
 
 #### GET /api/zone/1/vacation
 
