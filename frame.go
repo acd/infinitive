@@ -9,10 +9,18 @@ import (
 )
 
 const (
-	opRESPONSE = uint8(0x06)
-	opREAD     = uint8(0x0b)
-	opWRITE    = uint8(0x0c)
-	opERROR    = uint8(0x15)
+	ACK02             = uint8(0x02)
+	ACK06             = uint8(0x06)
+	READ_TABLE_BLOCK  = uint8(0x0b)
+	WRITE_TABLE_BLOCK = uint8(0x0c)
+	CHANGE_TABLE_NAME = uint8(0x10)
+	NACK              = uint8(0x15)
+	ALARM_PACKET      = uint8(0x1e)
+	READ_OBJECT_DATA  = uint8(0x22)
+	READ_VARIABLE     = uint8(0x62)
+	WRITE_VARIABLE    = uint8(0x63)
+	AUTO_VARIABLE     = uint8(0x64)
+	READ_LIST         = uint8(0x75)
 )
 
 var crcConfig = &crc16.Conf{
@@ -32,7 +40,7 @@ type InfinityFrame struct {
 var writeAck = &InfinityFrame{
 	src:  devSAM,
 	dst:  devTSTAT,
-	op:   opRESPONSE,
+	op:   ACK06,
 	data: []byte{0x00},
 }
 
@@ -48,14 +56,30 @@ func (f *InfinityFrame) String() string {
 
 func (f *InfinityFrame) opString() string {
 	switch f.op {
-	case opRESPONSE:
-		return "RESPONSE"
-	case opREAD:
+	case ACK02:
+		return "ACK02"
+	case ACK06:
+		return "ACK06"
+	case READ_TABLE_BLOCK:
 		return "READ"
-	case opWRITE:
+	case WRITE_TABLE_BLOCK:
 		return "WRITE"
-	case opERROR:
-		return "ERROR"
+	case CHANGE_TABLE_NAME:
+		return "CHGTBN"
+	case NACK:
+		return "NACK"
+	case ALARM_PACKET:
+		return "ALARM"
+	case READ_OBJECT_DATA:
+		return "OBJRD"
+	case READ_VARIABLE:
+		return "RDVAR"
+	case WRITE_VARIABLE:
+		return "FORCE"
+	case AUTO_VARIABLE:
+		return "AUTO"
+	case READ_LIST:
+		return "LIST"
 	default:
 		return fmt.Sprintf("UNKNOWN(%x)", f.op)
 	}
