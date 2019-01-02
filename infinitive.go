@@ -68,6 +68,26 @@ func getConfig() (*TStatZoneConfig, bool) {
 	}, true
 }
 
+func getTstatSettings() (*TStatSettings, bool) {
+	tss := TStatSettings{}
+	ok := infinity.ReadTable(devTSTAT, &tss)
+	if !ok {
+		return nil, false
+	}
+
+	return &TStatSettings{
+		BacklightSetting: tss.BacklightSetting,
+		AutoMode:         tss.AutoMode,
+		DeadBand:         tss.DeadBand,
+		CyclesPerHour:    tss.CyclesPerHour,
+		SchedulePeriods:  tss.SchedulePeriods,
+		ProgramsEnabled:  tss.ProgramsEnabled,
+		TempUnits:        tss.TempUnits,
+		DealerName:       tss.DealerName,
+		DealerPhone:      tss.DealerPhone,
+	}, true
+}
+
 func getAirHandler() (AirHandler, bool) {
 	b := cache.get("blower")
 	tb, ok := b.(*AirHandler)

@@ -26,6 +26,14 @@ func webserver(port int) {
 	r.Use(handleErrors) // attach error handling middleware
 
 	api := r.Group("/api")
+
+	api.GET("/tstat/settings", func(c *gin.Context) {
+		tss, ok := getTstatSettings()
+		if ok {
+			c.JSON(200, tss)
+		}
+	})
+
 	api.GET("/zone/1/config", func(c *gin.Context) {
 		cfg, ok := getConfig()
 		if ok {
