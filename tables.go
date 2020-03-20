@@ -23,7 +23,7 @@ type TStatCurrentParams struct {
 	Z7CurrentHumidity uint8
 	Z8CurrentHumidity uint8
 	Unknown1          uint8
-	OutdoorAirTemp    int8
+	OutdoorAirTemp    uint8
 	ZoneUnocc         uint8 // bitflags
 	Mode              uint8
 	Unknown2          [5]uint8
