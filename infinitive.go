@@ -14,7 +14,7 @@ import (
 type TStatZoneConfig struct {
 	CurrentTemp     uint8  `json:"currentTemp"`
 	CurrentHumidity uint8  `json:"currentHumidity"`
-	OutdoorTemp     int8  `json:"outdoorTemp"`
+	OutdoorTemp     int8   `json:"outdoorTemp"`
 	Mode            string `json:"mode"`
 	Stage           uint8  `json:"stage"`
 	FanMode         string `json:"fanMode"`
