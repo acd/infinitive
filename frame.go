@@ -9,10 +9,18 @@ import (
 )
 
 const (
-	opRESPONSE = uint8(0x06)
-	opREAD     = uint8(0x0b)
-	opWRITE    = uint8(0x0c)
-	opERROR    = uint8(0x15)
+	ack02           = uint8(0x02)
+	ack06           = uint8(0x06) //opRESPONSE
+	readTableBlock  = uint8(0x0b) //opREAD
+	writeTableBlock = uint8(0x0c) //opWRITE
+	changeTableName = uint8(0x10)
+	nack            = uint8(0x15) //opERROR
+	alarmPacket     = uint8(0x1e)
+	readObjectData  = uint8(0x22)
+	readVariable    = uint8(0x62)
+	writeVariable   = uint8(0x63)
+	autoVariable    = uint8(0x64)
+	readList        = uint8(0x75)
 )
 
 var crcConfig = &crc16.Conf{
@@ -32,7 +40,7 @@ type InfinityFrame struct {
 var writeAck = &InfinityFrame{
 	src:  devSAM,
 	dst:  devTSTAT,
-	op:   opRESPONSE,
+	op:   ack06,
 	data: []byte{0x00},
 }
 
@@ -48,14 +56,31 @@ func (f *InfinityFrame) String() string {
 
 func (f *InfinityFrame) opString() string {
 	switch f.op {
-	case opRESPONSE:
-		return "RESPONSE"
-	case opREAD:
+	case ack02:
+		return "ACK02"
+	case ack06:
+		return "ACK06"
+	case readTableBlock:
 		return "READ"
-	case opWRITE:
+	case writeTableBlock:
 		return "WRITE"
-	case opERROR:
-		return "ERROR"
+	case changeTableName:
+		return "CHGTBN"
+	case nack:
+		return "NACK"
+	case alarmPacket:
+		return "ALARM"
+	case readObjectData:
+		return "OBJRD"
+	case readVariable:
+		return "RDVAR"
+	case writeVariable:
+		return "FORCE"
+	case autoVariable:
+		return "AUTO"
+	case readList:
+		return "LIST"
+
 	default:
 		return fmt.Sprintf("UNKNOWN(%x)", f.op)
 	}
