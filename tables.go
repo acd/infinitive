@@ -171,3 +171,21 @@ func (params *TStatVacationParams) fromAPI(config *APIVacationConfig) byte {
 
 	return flags
 }
+
+type TStatSettings struct {
+	BacklightSetting uint8
+	AutoMode         uint8
+	Unknown1         uint8
+	DeadBand         uint8
+	CyclesPerHour    uint8
+	SchedulePeriods  uint8
+	ProgramsEnabled  uint8
+	TempUnits        uint8
+	Unknown2         uint8
+	DealerName       [20]byte
+	DealerPhone      [20]byte
+}
+
+func (params TStatSettings) addr() InfinityTableAddr {
+	return InfinityTableAddr{0x00, 0x3B, 0x06}
+}
