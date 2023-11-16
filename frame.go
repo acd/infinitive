@@ -37,7 +37,7 @@ type InfinityFrame struct {
 	data    []byte
 }
 
-var writeAck = &InfinityFrame{
+var writeAck = InfinityFrame{
 	src:  devSAM,
 	dst:  devTSTAT,
 	op:   ack06,
@@ -50,8 +50,13 @@ func checksum(b []byte) []byte {
 	return s.Sum(nil)
 }
 
-func (f *InfinityFrame) String() string {
+func (f InfinityFrame) String() string {
 	return fmt.Sprintf("%x -> %x: %-8s %x", f.src, f.dst, f.opString(), f.data)
+}
+
+func (f InfinityFrame) Clone() InfinityFrame {
+	f.data = append([]byte{}, f.data...)
+	return f
 }
 
 func (f *InfinityFrame) opString() string {
@@ -131,7 +136,7 @@ func (f *InfinityFrame) decode(buf []byte) bool {
 	f.dataLen = buf[4]
 	// Not sure what bytes 5 and 6 are
 	f.op = buf[7]
-	f.data = buf[8:l]
+	f.data = append([]byte{}, buf[8:l]...)
 
 	return true
 }

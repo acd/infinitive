@@ -14,10 +14,10 @@ const (
 	devSAM   = uint16(0x9201)
 )
 
-const responseTimeout = 200
+const responseTimeout = 200 * time.Millisecond
 const responseRetries = 5
 
-type snoopCallback func(*InfinityFrame)
+type snoopCallback func(InfinityFrame)
 
 type InfinityProtocolRawRequest struct {
 	data *[]byte
@@ -29,22 +29,32 @@ type InfinityProtocolSnoop struct {
 	cb     snoopCallback
 }
 
+type SnoopList []InfinityProtocolSnoop
+
 type InfinityProtocol struct {
 	device     string
 	port       *serial.Port
-	responseCh chan *InfinityFrame
+	responseCh chan InfinityFrame
 	actionCh   chan *Action
-	snoops     []InfinityProtocolSnoop
+	snoops     SnoopList
 }
 
 type Action struct {
-	requestFrame  *InfinityFrame
+	requestFrame  InfinityFrame
 	responseFrame *InfinityFrame
 	ok            bool
 	ch            chan bool
 }
 
 var readTimeout = time.Second * 5
+
+func (l SnoopList) handle(frame InfinityFrame) {
+	for _, s := range l {
+		if frame.src >= s.srcMin && frame.src <= s.srcMax {
+			s.cb(frame.Clone())
+		}
+	}
+}
 
 func (p *InfinityProtocol) openSerial() error {
 	log.Printf("opening serial interface: %s", p.device)
@@ -68,7 +78,7 @@ func (p *InfinityProtocol) Open() error {
 		return err
 	}
 
-	p.responseCh = make(chan *InfinityFrame, 32)
+	p.responseCh = make(chan InfinityFrame, 32)
 	p.actionCh = make(chan *Action)
 
 	go p.reader()
@@ -77,7 +87,7 @@ func (p *InfinityProtocol) Open() error {
 	return nil
 }
 
-func (p *InfinityProtocol) handleFrame(frame *InfinityFrame) *InfinityFrame {
+func (p *InfinityProtocol) handleFrame(frame InfinityFrame) *InfinityFrame {
 	log.Printf("read frame: %s", frame)
 
 	switch frame.op {
@@ -87,15 +97,11 @@ func (p *InfinityProtocol) handleFrame(frame *InfinityFrame) *InfinityFrame {
 		}
 
 		if len(frame.data) > 3 {
-			for _, s := range p.snoops {
-				if frame.src >= s.srcMin && frame.src <= s.srcMax {
-					s.cb(frame)
-				}
-			}
+			p.snoops.handle(frame)
 		}
 	case writeTableBlock:
 		if frame.src == devTSTAT && frame.dst == devSAM {
-			return writeAck
+			return &writeAck
 		}
 	}
 
@@ -123,6 +129,7 @@ func (p *InfinityProtocol) reader() {
 			p.port = nil
 			continue
 		}
+
 		// log.Printf("%q", buf[:n])
 		msg = append(msg, buf[:n]...)
 		// log.Printf("buf len is: %v", len(msg))
@@ -137,12 +144,12 @@ func (p *InfinityProtocol) reader() {
 			}
 			buf := msg[:l]
 
-			frame := &InfinityFrame{}
+			frame := InfinityFrame{}
 			if frame.decode(buf) {
-				response := p.handleFrame(frame)
-				if response != nil {
+				if response := p.handleFrame(frame); response != nil {
 					p.sendFrame(response.encode())
 				}
+
 				// Intentionally didn't do msg = msg[l:] to avoid potential
 				// memory leak.  Not sure if it makes a difference...
 				msg = msg[:copy(msg, msg[l:])]
@@ -157,24 +164,19 @@ func (p *InfinityProtocol) reader() {
 func (p *InfinityProtocol) broker() {
 	defer panic("exiting InfinityProtocol broker, this should never happen")
 
-	for {
-		// log.Debug("entering action select")
-		select {
-		case action := <-p.actionCh:
-			p.performAction(action)
-		case <-p.responseCh:
-			log.Warn("dropping unexpected response")
-		}
+	for action := range p.actionCh {
+		p.performAction(action)
 	}
 }
 
 func (p *InfinityProtocol) performAction(action *Action) {
 	log.Infof("encoded frame: %s", action.requestFrame)
 	encodedFrame := action.requestFrame.encode()
-
 	p.sendFrame(encodedFrame)
-	ticker := time.NewTicker(time.Millisecond * responseTimeout)
+
+	ticker := time.NewTicker(responseTimeout)
 	defer ticker.Stop()
+
 	for tries := 0; tries < responseRetries; {
 		select {
 		case res := <-p.responseCh:
@@ -189,7 +191,8 @@ func (p *InfinityProtocol) performAction(action *Action) {
 				log.Printf("got response for incorrect table, is: %x expected: %x", resTable, reqTable)
 				continue
 			}
-			action.responseFrame = res
+
+			action.responseFrame = &res
 			// log.Printf("got response!")
 			action.ok = true
 			action.ch <- true
@@ -208,7 +211,7 @@ func (p *InfinityProtocol) performAction(action *Action) {
 
 func (p *InfinityProtocol) send(dst uint16, op uint8, requestData []byte, response interface{}) bool {
 	f := InfinityFrame{src: devSAM, dst: dst, op: op, data: requestData}
-	act := &Action{requestFrame: &f, ch: make(chan bool)}
+	act := &Action{requestFrame: f, ch: make(chan bool)}
 
 	// Send action to action handling goroutine
 	p.actionCh <- act

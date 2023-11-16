@@ -13,6 +13,7 @@ import (
 )
 
 type TStatZoneConfig struct {
+	TempUnit        string `json:"tempUnit"`
 	CurrentTemp     uint8  `json:"currentTemp"`
 	CurrentHumidity uint8  `json:"currentHumidity"`
 	OutdoorTemp     int8   `json:"outdoorTemp"`
@@ -32,6 +33,7 @@ type AirHandler struct {
 }
 
 type HeatPump struct {
+	TempUnit    string  `json:"tempUnit"`
 	CoilTemp    float32 `json:"coilTemp"`
 	OutsideTemp float32 `json:"outsideTemp"`
 	Stage       uint8   `json:"stage"`
@@ -121,7 +123,7 @@ func statePoller(cache *cache.Cache) {
 
 func attachSnoops(cache *cache.Cache) {
 	// Snoop Heat Pump responses
-	infinity.snoopResponse(0x5000, 0x51ff, func(frame *InfinityFrame) {
+	infinity.snoopResponse(0x5000, 0x51ff, func(frame InfinityFrame) {
 		data := frame.data[3:]
 		heatPump, ok := getHeatPump(cache)
 		if ok {
@@ -140,7 +142,7 @@ func attachSnoops(cache *cache.Cache) {
 	})
 
 	// Snoop Air Handler responses
-	infinity.snoopResponse(0x4000, 0x42ff, func(frame *InfinityFrame) {
+	infinity.snoopResponse(0x4000, 0x42ff, func(frame InfinityFrame) {
 		data := frame.data[3:]
 		airHandler, ok := getAirHandler(cache)
 		if ok {
