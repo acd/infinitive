@@ -1,21 +1,20 @@
 package main
 
 import (
-	"embed"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strconv"
 
 	"golang.org/x/net/websocket"
 
+	"github.com/acd/infinitive/internal/assets"
+	"github.com/acd/infinitive/internal/cache"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 )
-
-//go:embed assets
-var assets embed.FS
 
 func handleErrors(c *gin.Context) {
 	c.Next()
@@ -25,7 +24,24 @@ func handleErrors(c *gin.Context) {
 	}
 }
 
-func webserver(port int) {
+type webserver struct {
+	srv   *http.Server
+	cache *cache.Cache
+}
+
+func launchWebserver(port int, cache *cache.Cache) error {
+	ws := webserver{
+		cache: cache,
+	}
+	ws.srv = &http.Server{
+		Addr:    fmt.Sprintf(":%d", port),
+		Handler: ws.buildEngine().Handler(),
+	}
+
+	return ws.srv.ListenAndServe()
+}
+
+func (ws *webserver) buildEngine() *gin.Engine {
 	r := gin.Default()
 	r.Use(handleErrors) // attach error handling middleware
 
@@ -46,14 +62,14 @@ func webserver(port int) {
 	})
 
 	api.GET("/zone/1/airhandler", func(c *gin.Context) {
-		ah, ok := getAirHandler()
+		ah, ok := getAirHandler(ws.cache)
 		if ok {
 			c.JSON(200, ah)
 		}
 	})
 
 	api.GET("/zone/1/heatpump", func(c *gin.Context) {
-		hp, ok := getHeatPump()
+		hp, ok := getHeatPump(ws.cache)
 		if ok {
 			c.JSON(200, hp)
 		}
@@ -79,7 +95,6 @@ func webserver(port int) {
 		flags := params.fromAPI(&args)
 
 		infinity.WriteTable(devTSTAT, params, flags)
-
 	})
 
 	api.PUT("/zone/1/config", func(c *gin.Context) {
@@ -157,26 +172,26 @@ func webserver(port int) {
 	})
 
 	api.GET("/ws", func(c *gin.Context) {
-		h := websocket.Handler(attachListener)
+		h := websocket.Handler(ws.websocketListener)
 		h.ServeHTTP(c.Writer, c.Request)
 	})
 
-	r.StaticFS("/ui", http.FS(assets))
+	r.StaticFS("/ui", http.FS(assets.Assets))
 
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(http.StatusMovedPermanently, "ui")
 	})
 
-	r.Run(":" + strconv.Itoa(port)) // listen and server on 0.0.0.0:8080
+	return r
 }
 
-func attachListener(ws *websocket.Conn) {
+func (ws *webserver) websocketListener(wsConn *websocket.Conn) {
 	listener := &EventListener{make(chan []byte, 32)}
 
 	defer func() {
 		Dispatcher.deregister <- listener
 		log.Printf("closing websocket")
-		err := ws.Close()
+		err := wsConn.Close()
 		if err != nil {
 			log.Println("error on ws close:", err.Error())
 		}
@@ -185,25 +200,16 @@ func attachListener(ws *websocket.Conn) {
 	Dispatcher.register <- listener
 
 	log.Printf("dumping cached data")
-	for source, data := range cache {
+	for source, data := range ws.cache.Dump() {
 		log.Printf("dumping %s", source)
-		ws.Write(serializeEvent(source, data))
+		wsConn.Write(serializeEvent(source, data))
 	}
 
 	// wait for events
-	for {
-		select {
-		case message, ok := <-listener.ch:
-			if !ok {
-				log.Printf("read from listener.ch was not okay")
-				return
-			} else {
-				_, err := ws.Write(message)
-				if err != nil {
-					log.Printf("error on websocket write: %s", err.Error())
-					return
-				}
-			}
+	for message := range listener.ch {
+		if _, err := wsConn.Write(message); err != nil {
+			log.Printf("error on websocket write: %s", err.Error())
+			return
 		}
 	}
 }

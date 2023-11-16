@@ -8,6 +8,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/acd/infinitive/internal/cache"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -88,8 +89,8 @@ func getTstatSettings() (*TStatSettings, bool) {
 	}, true
 }
 
-func getAirHandler() (AirHandler, bool) {
-	b := cache.get("blower")
+func getAirHandler(cache *cache.Cache) (AirHandler, bool) {
+	b := cache.Get("blower")
 	tb, ok := b.(*AirHandler)
 	if !ok {
 		return AirHandler{}, false
@@ -97,8 +98,8 @@ func getAirHandler() (AirHandler, bool) {
 	return *tb, true
 }
 
-func getHeatPump() (HeatPump, bool) {
-	h := cache.get("heatpump")
+func getHeatPump(cache *cache.Cache) (HeatPump, bool) {
+	h := cache.Get("heatpump")
 	th, ok := h.(*HeatPump)
 	if !ok {
 		return HeatPump{}, false
@@ -106,33 +107,34 @@ func getHeatPump() (HeatPump, bool) {
 	return *th, true
 }
 
-func statePoller() {
+func statePoller(cache *cache.Cache) {
+	ticker := time.NewTicker(time.Second)
+
 	for {
-		c, ok := getConfig()
-		if ok {
-			cache.update("tstat", c)
+		if c, ok := getConfig(); ok {
+			cache.Update("tstat", c)
 		}
 
-		time.Sleep(time.Second * 1)
+		<-ticker.C
 	}
 }
 
-func attachSnoops() {
+func attachSnoops(cache *cache.Cache) {
 	// Snoop Heat Pump responses
 	infinity.snoopResponse(0x5000, 0x51ff, func(frame *InfinityFrame) {
 		data := frame.data[3:]
-		heatPump, ok := getHeatPump()
+		heatPump, ok := getHeatPump(cache)
 		if ok {
 			if bytes.Equal(frame.data[0:3], []byte{0x00, 0x3e, 0x01}) {
 				heatPump.CoilTemp = float32(binary.BigEndian.Uint16(data[2:4])) / float32(16)
 				heatPump.OutsideTemp = float32(binary.BigEndian.Uint16(data[0:2])) / float32(16)
 				log.Debugf("heat pump coil temp is: %f", heatPump.CoilTemp)
 				log.Debugf("heat pump outside temp is: %f", heatPump.OutsideTemp)
-				cache.update("heatpump", &heatPump)
+				cache.Update("heatpump", &heatPump)
 			} else if bytes.Equal(frame.data[0:3], []byte{0x00, 0x3e, 0x02}) {
 				heatPump.Stage = data[0] >> 1
 				log.Debugf("HP stage is: %d", heatPump.Stage)
-				cache.update("heatpump", &heatPump)
+				cache.Update("heatpump", &heatPump)
 			}
 		}
 	})
@@ -140,17 +142,17 @@ func attachSnoops() {
 	// Snoop Air Handler responses
 	infinity.snoopResponse(0x4000, 0x42ff, func(frame *InfinityFrame) {
 		data := frame.data[3:]
-		airHandler, ok := getAirHandler()
+		airHandler, ok := getAirHandler(cache)
 		if ok {
 			if bytes.Equal(frame.data[0:3], []byte{0x00, 0x03, 0x06}) {
 				airHandler.BlowerRPM = binary.BigEndian.Uint16(data[1:5])
 				log.Debugf("blower RPM is: %d", airHandler.BlowerRPM)
-				cache.update("blower", &airHandler)
+				cache.Update("blower", &airHandler)
 			} else if bytes.Equal(frame.data[0:3], []byte{0x00, 0x03, 0x16}) {
 				airHandler.AirFlowCFM = binary.BigEndian.Uint16(data[4:8])
 				airHandler.ElecHeat = data[0]&0x03 != 0
 				log.Debugf("air flow CFM is: %d", airHandler.AirFlowCFM)
-				cache.update("blower", &airHandler)
+				cache.Update("blower", &airHandler)
 			}
 		}
 	})
@@ -172,16 +174,18 @@ func main() {
 	log.SetLevel(log.DebugLevel)
 
 	infinity = &InfinityProtocol{device: *serialPort}
-	airHandler := new(AirHandler)
-	heatPump := new(HeatPump)
-	cache.update("blower", airHandler)
-	cache.update("heatpump", heatPump)
-	attachSnoops()
+
+	cache := cache.New(Dispatcher.broadcastEvent)
+	// Set default values for structs the UI cares about
+	cache.Update("blower", &AirHandler{})
+	cache.Update("heatpump", &HeatPump{})
+
+	attachSnoops(cache)
 	err := infinity.Open()
 	if err != nil {
 		log.Panicf("error opening serial port: %s", err.Error())
 	}
 
-	go statePoller()
-	webserver(*httpPort)
+	go statePoller(cache)
+	launchWebserver(*httpPort, cache)
 }
