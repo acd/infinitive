@@ -107,7 +107,7 @@ func (ws *webserver) buildEngine() *gin.Engine {
 
 		zone, err := strconv.Atoi(c.Param("zone"))
 		if err != nil || zone < 1 || zone > 8 {
-			c.AbortWithError(http.StatusBadRequest, fmt.Errorf("invalid zone: %d", zone))
+			c.AbortWithError(http.StatusBadRequest, fmt.Errorf("invalid zone: %s", c.Param("zone")))
 			return
 		}
 
@@ -122,10 +122,20 @@ func (ws *webserver) buildEngine() *gin.Engine {
 		}
 
 		if args.Hold != nil {
+			// We have to read the current settings since hold is a bitfield and we need to
+			// retain the configuration for other zones.
+			priorParams := TStatZoneParams{}
+			ok := infinity.ReadTable(devTSTAT, &priorParams)
+			if !ok {
+				c.AbortWithStatus(http.StatusInternalServerError)
+				return
+			}
+
+			params.ZoneHold = priorParams.ZoneHold
 			if *args.Hold {
-				params.ZoneHold = 0x01
+				params.ZoneHold |= 1 << (zone - 1)
 			} else {
-				params.ZoneHold = 0x00
+				params.ZoneHold &= ^(1 << (zone - 1))
 			}
 			flags |= 0x02
 		}
