@@ -1,5 +1,10 @@
 package main
 
+import (
+	"fmt"
+	"reflect"
+)
+
 type InfinityTableAddr [3]byte
 type InfinityTable interface {
 	addr() InfinityTableAddr
@@ -90,6 +95,20 @@ type TStatZoneParams struct {
 
 func (params TStatZoneParams) addr() InfinityTableAddr {
 	return InfinityTableAddr{0x00, 0x3B, 0x03}
+}
+
+func (params *TStatZoneParams) setZonalField(zone int, fieldName string, value uint8) bool {
+	fieldName = fmt.Sprintf("Z%d%s", zone, fieldName)
+
+	v := reflect.ValueOf(params).Elem()
+	for i := 0; i < v.NumField(); i++ {
+		if v.Type().Field(i).Name == fieldName {
+			v.Field(i).Set(reflect.ValueOf(value))
+			return true
+		}
+	}
+
+	return false
 }
 
 type TStatVacationParams struct {

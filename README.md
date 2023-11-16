@@ -82,6 +82,8 @@ rawMode included for debugging purposes. It encodes stage and mode.
 
 #### PUT /api/zone/1/config
 
+Valid values for zone are 1-8.
+
 ```json
 {
    "mode": "auto",
@@ -162,7 +164,7 @@ I believe Infinitive should work with Bryant Evolution systems as they use the s
 
 #### Unimplemented features
 
-Multi-zone Infinity HVAC systems are not supported.  I only have a single zone setup, so I can't test if multi-zone capability works properly even if I implement it.  If you have a multi-zone setup and want to be a guinea pig, get in touch and maybe we can work something out.
+Multi-zone Infinity HVAC systems are partially supported.  For now, the set API supports manipulating zonal fan mode, heat setpoint, and cool setpoint.  I only have a single zone setup, so I can't test if multi-zone capability works properly.  If you have a multi-zone setup and want to be a guinea pig, get in touch and maybe we can work something out.
 
 I don't use the thermostat's scheduling capabilities or vacation mode so Infinitive does not support them.  Reach out if this is something you'd like to see.  
 

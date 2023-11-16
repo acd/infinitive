@@ -97,50 +97,57 @@ func (ws *webserver) buildEngine() *gin.Engine {
 		infinity.WriteTable(devTSTAT, params, flags)
 	})
 
-	api.PUT("/zone/1/config", func(c *gin.Context) {
+	api.PUT("/zone/:zone/config", func(c *gin.Context) {
 		var args TStatZoneConfig
 
-		if c.Bind(&args) == nil {
-			params := TStatZoneParams{}
-			flags := byte(0)
+		if c.Bind(&args) != nil {
+			c.AbortWithStatus(http.StatusBadRequest)
+			return
+		}
 
-			if len(args.FanMode) > 0 {
-				mode, _ := stringFanModeToRaw(args.FanMode)
-				// FIXME: check for ok here
-				params.Z1FanMode = mode
-				flags |= 0x01
-			}
+		zone, err := strconv.Atoi(c.Param("zone"))
+		if err != nil || zone < 1 || zone > 8 {
+			c.AbortWithError(http.StatusBadRequest, fmt.Errorf("invalid zone: %d", zone))
+			return
+		}
 
-			if args.Hold != nil {
-				if *args.Hold {
-					params.ZoneHold = 0x01
-				} else {
-					params.ZoneHold = 0x00
-				}
-				flags |= 0x02
-			}
+		params := TStatZoneParams{}
+		flags := byte(0)
 
-			if args.HeatSetpoint > 0 {
-				params.Z1HeatSetpoint = args.HeatSetpoint
-				flags |= 0x04
-			}
+		if len(args.FanMode) > 0 {
+			mode, _ := stringFanModeToRaw(args.FanMode)
+			// FIXME: check for ok here
+			params.setZonalField(zone, "FanMode", mode)
+			flags |= 0x01
+		}
 
-			if args.CoolSetpoint > 0 {
-				params.Z1CoolSetpoint = args.CoolSetpoint
-				flags |= 0x08
+		if args.Hold != nil {
+			if *args.Hold {
+				params.ZoneHold = 0x01
+			} else {
+				params.ZoneHold = 0x00
 			}
+			flags |= 0x02
+		}
 
-			if flags != 0 {
-				log.Printf("calling doWrite with flags: %x", flags)
-				infinity.WriteTable(devTSTAT, params, flags)
-			}
+		if args.HeatSetpoint > 0 {
+			params.setZonalField(zone, "HeatSetpoint", args.HeatSetpoint)
+			flags |= 0x04
+		}
 
-			if len(args.Mode) > 0 {
-				p := TStatCurrentParams{Mode: stringModeToRaw(args.Mode)}
-				infinity.WriteTable(devTSTAT, p, 0x10)
-			}
-		} else {
-			log.Printf("bind failed")
+		if args.CoolSetpoint > 0 {
+			params.setZonalField(zone, "CoolSetpoint", args.CoolSetpoint)
+			flags |= 0x08
+		}
+
+		if flags != 0 {
+			log.Printf("calling doWrite with flags: %x", flags)
+			infinity.WriteTable(devTSTAT, params, flags)
+		}
+
+		if len(args.Mode) > 0 {
+			p := TStatCurrentParams{Mode: stringModeToRaw(args.Mode)}
+			infinity.WriteTable(devTSTAT, p, 0x10)
 		}
 	})
 
