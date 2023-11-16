@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"encoding/hex"
 	"errors"
 	"net/http"
@@ -9,9 +10,12 @@ import (
 
 	"golang.org/x/net/websocket"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/gin-gonic/gin"
+	log "github.com/sirupsen/logrus"
 )
+
+//go:embed assets
+var assets embed.FS
 
 func handleErrors(c *gin.Context) {
 	c.Next()
@@ -157,8 +161,7 @@ func webserver(port int) {
 		h.ServeHTTP(c.Writer, c.Request)
 	})
 
-	r.StaticFS("/ui", assetFS())
-	// r.Static("/ui", "github.com/acd/infinitease/assets")
+	r.StaticFS("/ui", http.FS(assets))
 
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(http.StatusMovedPermanently, "ui")
