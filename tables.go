@@ -111,6 +111,26 @@ func (params *TStatZoneParams) setZonalField(zone int, fieldName string, value u
 	return false
 }
 
+func (params *TStatZoneParams) getZonalField(zone int, fieldName string) any {
+	return getZonalField(params, zone, fieldName)
+}
+
+func getZonalField(s any, zone int, fieldName string) any {
+	fieldName = fmt.Sprintf("Z%d%s", zone, fieldName)
+
+	v := reflect.ValueOf(s).Elem()
+	for i := 0; i < v.NumField(); i++ {
+		if v.Type().Field(i).Name == fieldName {
+			return v.Field(i).Interface()
+		}
+	}
+	return nil
+}
+
+func (params *TStatCurrentParams) getZonalField(zone int, fieldName string) any {
+	return getZonalField(params, zone, fieldName)
+}
+
 type TStatVacationParams struct {
 	Active         uint8
 	Hours          uint16

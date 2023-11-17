@@ -48,7 +48,7 @@ type HeatPump struct {
 
 var infinity *InfinityProtocol
 
-func getConfig() (*TStatZoneConfig, bool) {
+func getConfig(zone int) (*TStatZoneConfig, bool) {
 	cfg := TStatZoneParams{}
 	ok := infinity.ReadTable(devTSTAT, &cfg)
 	if !ok {
@@ -62,40 +62,28 @@ func getConfig() (*TStatZoneConfig, bool) {
 	}
 
 	hold := new(bool)
-	*hold = cfg.ZoneHold&0x01 == 1
+	*hold = cfg.ZoneHold&(1<<zone-1) != 0
 
 	return &TStatZoneConfig{
-		CurrentTemp:     params.Z1CurrentTemp,
-		CurrentHumidity: params.Z1CurrentHumidity,
+		CurrentTemp:     params.getZonalField(zone, "CurrentTemp").(uint8),
+		CurrentHumidity: params.getZonalField(zone, "CurrentHumidity").(uint8),
 		OutdoorTemp:     params.OutdoorAirTemp,
 		Mode:            rawModeToString(params.Mode & 0xf),
 		Stage:           params.Mode >> 5,
-		FanMode:         rawFanModeToString(cfg.Z1FanMode),
+		FanMode:         rawFanModeToString(cfg.getZonalField(zone, "FanMode").(uint8)),
 		Hold:            hold,
-		HeatSetpoint:    cfg.Z1HeatSetpoint,
-		CoolSetpoint:    cfg.Z1CoolSetpoint,
+		HeatSetpoint:    cfg.getZonalField(zone, "HeatSetpoint").(uint8),
+		CoolSetpoint:    cfg.getZonalField(zone, "CoolSetpoint").(uint8),
 		RawMode:         params.Mode,
 	}, true
 }
 
 func getTstatSettings() (*TStatSettings, bool) {
 	tss := TStatSettings{}
-	ok := infinity.ReadTable(devTSTAT, &tss)
-	if !ok {
+	if !infinity.ReadTable(devTSTAT, &tss) {
 		return nil, false
 	}
-
-	return &TStatSettings{
-		BacklightSetting: tss.BacklightSetting,
-		AutoMode:         tss.AutoMode,
-		DeadBand:         tss.DeadBand,
-		CyclesPerHour:    tss.CyclesPerHour,
-		SchedulePeriods:  tss.SchedulePeriods,
-		ProgramsEnabled:  tss.ProgramsEnabled,
-		TempUnits:        tss.TempUnits,
-		DealerName:       tss.DealerName,
-		DealerPhone:      tss.DealerPhone,
-	}, true
+	return &tss, true
 }
 
 func getAirHandler(cache *cache.Cache) (AirHandler, bool) {
@@ -120,7 +108,7 @@ func statePoller(cache *cache.Cache) {
 	ticker := time.NewTicker(time.Second)
 
 	for {
-		if c, ok := getConfig(); ok {
+		if c, ok := getConfig(1); ok {
 			cache.Update(tstatCacheKey, c)
 		}
 

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/binary"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -37,6 +38,7 @@ type InfinityProtocol struct {
 	responseCh chan InfinityFrame
 	actionCh   chan *Action
 	snoops     SnoopList
+	mu         sync.Mutex
 }
 
 type Action struct {
@@ -97,6 +99,8 @@ func (p *InfinityProtocol) handleFrame(frame InfinityFrame) *InfinityFrame {
 		}
 
 		if len(frame.data) > 3 {
+			p.mu.Lock()
+			defer p.mu.Unlock()
 			p.snoops.handle(frame)
 		}
 	case writeTableBlock:
@@ -277,5 +281,7 @@ func (p *InfinityProtocol) sendFrame(buf []byte) bool {
 
 func (p *InfinityProtocol) snoopResponse(srcMin uint16, srcMax uint16, cb snoopCallback) {
 	s := InfinityProtocolSnoop{srcMin: srcMin, srcMax: srcMax, cb: cb}
+	p.mu.Lock()
 	p.snoops = append(p.snoops, s)
+	p.mu.Unlock()
 }

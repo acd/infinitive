@@ -57,8 +57,14 @@ func (ws *webserver) buildEngine() *gin.Engine {
 		}
 	})
 
-	api.GET("/zone/1/config", func(c *gin.Context) {
-		cfg, ok := getConfig()
+	api.GET("/zone/:zone/config", func(c *gin.Context) {
+		zone, err := strconv.Atoi(c.Param("zone"))
+		if err != nil || zone < 1 || zone > 8 {
+			c.AbortWithError(http.StatusBadRequest, fmt.Errorf("invalid zone: %s", c.Param("zone")))
+			return
+		}
+
+		cfg, ok := getConfig(zone)
 		if ok {
 			c.JSON(200, cfg)
 		}
