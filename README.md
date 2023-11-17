@@ -51,7 +51,7 @@ There is a brief delay between altering a setting and Infinitive updating the in
 
 ## Building from source
 
-If you'd like to build Infinitive from source, first confirm you have a working Go environment (I've been using release 1.7.1).  Ensure your GOPATH and GOHOME are set correctly, then:
+If you'd like to build Infinitive from source, first confirm you have a working Go environment (I've been using release 1.21).  Ensure your GOPATH and GOHOME are set correctly, then:
 
 ```
 $ go get github.com/acd/infinitive
@@ -70,7 +70,7 @@ Infinitive exposes a JSON API to retrieve and manipulate thermostat parameters.
    "currentHumidity": 50,
    "outdoorTemp": 50,
    "mode": "heat",
-   "stage":2,
+   "stage": 2,
    "fanMode": "auto",
    "hold": true,
    "heatSetpoint": 68,
@@ -98,7 +98,7 @@ Valid write values for `mode` are `off`, `auto`, `heat`, and `cool`.
 Additional read values for mode are `electric` and `heatpump` indicating "heat pump only" or "electric heat only" have been selected at the thermostat 
 Values for `fanMode` are `auto`, `low`, `med`, and `high`.
 
-#### GET /api/zone/1/airhandler
+#### GET /api/airhandler
 
 ```json
 {
@@ -108,7 +108,7 @@ Values for `fanMode` are `auto`, `low`, `med`, and `high`.
 }
 ```
 
-#### GET /api/zone/1/heatpump
+#### GET /api/heatpump
 
 ```json
 {
