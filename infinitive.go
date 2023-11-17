@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/acd/infinitive/internal/cache"
+	"github.com/acd/infinitive/internal/dispatcher"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -179,7 +180,8 @@ func main() {
 
 	infinity = &InfinityProtocol{device: *serialPort}
 
-	cache := cache.New(Dispatcher.broadcastEvent)
+	dispatcher := dispatcher.New()
+	cache := cache.New(dispatcher.BroadcastEvent)
 	// Set default values for structs the UI cares about
 	cache.Update(blowerCacheKey, &AirHandler{})
 	cache.Update(heatpumpCacheKey, &HeatPump{})
@@ -191,5 +193,5 @@ func main() {
 	}
 
 	go statePoller(cache)
-	launchWebserver(*httpPort, cache)
+	launchWebserver(*httpPort, cache, dispatcher)
 }

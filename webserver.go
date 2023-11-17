@@ -12,6 +12,7 @@ import (
 
 	"github.com/acd/infinitive/internal/assets"
 	"github.com/acd/infinitive/internal/cache"
+	"github.com/acd/infinitive/internal/dispatcher"
 	"github.com/gin-gonic/gin"
 	log "github.com/sirupsen/logrus"
 )
@@ -25,13 +26,15 @@ func handleErrors(c *gin.Context) {
 }
 
 type webserver struct {
-	srv   *http.Server
-	cache *cache.Cache
+	srv        *http.Server
+	cache      *cache.Cache
+	dispatcher *dispatcher.Dispatcher
 }
 
-func launchWebserver(port int, cache *cache.Cache) error {
+func launchWebserver(port int, cache *cache.Cache, dispatcher *dispatcher.Dispatcher) error {
 	ws := webserver{
-		cache: cache,
+		cache:      cache,
+		dispatcher: dispatcher,
 	}
 	ws.srv = &http.Server{
 		Addr:    fmt.Sprintf(":%d", port),
@@ -203,10 +206,10 @@ func (ws *webserver) buildEngine() *gin.Engine {
 }
 
 func (ws *webserver) websocketListener(wsConn *websocket.Conn) {
-	listener := &EventListener{make(chan []byte, 32)}
+	listener := ws.dispatcher.NewListener()
 
 	defer func() {
-		Dispatcher.deregister <- listener
+		ws.dispatcher.Deregister(listener)
 		log.Printf("closing websocket")
 		err := wsConn.Close()
 		if err != nil {
@@ -214,16 +217,14 @@ func (ws *webserver) websocketListener(wsConn *websocket.Conn) {
 		}
 	}()
 
-	Dispatcher.register <- listener
-
 	log.Printf("dumping cached data")
 	for source, data := range ws.cache.Dump() {
 		log.Printf("dumping %s", source)
-		wsConn.Write(serializeEvent(source, data))
+		wsConn.Write(dispatcher.SerializeEvent(source, data))
 	}
 
 	// wait for events
-	for message := range listener.ch {
+	for message := range listener.Receive() {
 		if _, err := wsConn.Write(message); err != nil {
 			log.Printf("error on websocket write: %s", err.Error())
 			return

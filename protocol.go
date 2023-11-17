@@ -88,7 +88,7 @@ func (p *InfinityProtocol) Open() error {
 }
 
 func (p *InfinityProtocol) handleFrame(frame InfinityFrame) *InfinityFrame {
-	log.Printf("read frame: %s", frame)
+	// log.Printf("read frame: %s", frame)
 
 	switch frame.op {
 	case ack06:
@@ -264,7 +264,7 @@ func (p *InfinityProtocol) sendFrame(buf []byte) bool {
 		return false
 	}
 
-	log.Debugf("transmitting frame: %x", buf)
+	// log.Debugf("transmitting frame: %x", buf)
 	_, err := p.port.Write(buf)
 	if err != nil {
 		log.Errorf("error writing to serial: %s", err.Error())
