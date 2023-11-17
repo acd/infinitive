@@ -98,7 +98,7 @@ func (ws *webserver) buildEngine() *gin.Engine {
 
 	api.GET("/zone/1/vacation", func(c *gin.Context) {
 		vac := infinity.TStatVacationParams{}
-		ok := ws.api.Protocol.ReadTable(infinity.DevTSTAT, &vac)
+		ok := ws.api.Bus.ReadTable(infinity.DevTSTAT, &vac)
 		if ok {
 			c.JSON(200, vac.ToAPI())
 		}
@@ -144,7 +144,7 @@ func (ws *webserver) buildEngine() *gin.Engine {
 			// We have to read the current settings since hold is a bitfield and we need to
 			// retain the configuration for other zones.
 			priorParams := infinity.TStatZoneParams{}
-			ok := ws.api.Protocol.ReadTable(infinity.DevTSTAT, &priorParams)
+			ok := ws.api.Bus.ReadTable(infinity.DevTSTAT, &priorParams)
 			if !ok {
 				c.AbortWithStatus(http.StatusInternalServerError)
 				return

@@ -59,6 +59,15 @@ func (f Frame) Clone() Frame {
 	return f
 }
 
+type framePredicate func(Frame) bool
+type frameHandler func(Frame)
+
+func sourceRange(srcMin uint16, srcMax uint16) framePredicate {
+	return func(f Frame) bool {
+		return f.src >= srcMin && f.src <= srcMax
+	}
+}
+
 var opsToString = [256]string{
 	Ack02:           "ACK02",
 	Ack06:           "ACK06",

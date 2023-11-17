@@ -22,39 +22,38 @@ type rawRequest struct {
 	Data *[]byte
 }
 
-type protocolSnoop struct {
-	srcMin uint16
-	srcMax uint16
-	cb     func(Frame)
+// For future use in unit tests
+type port interface {
+	Read(b []byte) (n int, err error)
+	Write(b []byte) (n int, err error)
+	Close() error
 }
 
-type snoopList []protocolSnoop
-
-type Protocol struct {
+type Bus struct {
 	device      string
 	readTimeout time.Duration
-	port        *serial.Port
+	port        port
 	responseCh  chan Frame
 	actionCh    chan *Action
-	snoops      snoopList
+	snoops      []frameHandler
 	mu          sync.Mutex
 }
 
-func NewProtocol(device string) (*Protocol, error) {
-	p := &Protocol{
+func NewBus(device string) (*Bus, error) {
+	b := &Bus{
 		device:      device,
 		readTimeout: time.Second * 5,
 		responseCh:  make(chan Frame, 32),
 		actionCh:    make(chan *Action),
 	}
-	if err := p.openSerial(); err != nil {
+	if err := b.openSerial(); err != nil {
 		return nil, err
 	}
 
-	go p.reader()
-	go p.broker()
+	go b.reader()
+	go b.broker()
 
-	return p, nil
+	return b, nil
 }
 
 type Action struct {
@@ -64,48 +63,38 @@ type Action struct {
 	ch            chan bool
 }
 
-func (l snoopList) handle(frame Frame) {
-	for _, s := range l {
-		if frame.src >= s.srcMin && frame.src <= s.srcMax {
-			s.cb(frame.Clone())
-		}
-	}
-}
-
-func (p *Protocol) openSerial() error {
-	log.Printf("opening serial interface: %s", p.device)
-	if p.port != nil {
-		p.port.Close()
-		p.port = nil
+func (b *Bus) openSerial() error {
+	log.Printf("opening serial interface: %s", b.device)
+	if b.port != nil {
+		b.port.Close()
+		b.port = nil
 	}
 
 	c := &serial.Config{
-		Name:        p.device,
+		Name:        b.device,
 		Baud:        38400,
-		ReadTimeout: p.readTimeout,
+		ReadTimeout: b.readTimeout,
 	}
 	var err error
-	p.port, err = serial.OpenPort(c)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	b.port, err = serial.OpenPort(c)
+	return err
 }
 
-func (p *Protocol) handleFrame(frame Frame) *Frame {
+func (b *Bus) handleFrame(frame Frame) *Frame {
 	log.Printf("read frame: %s", frame)
 
 	switch frame.op {
 	case Ack06:
 		if frame.dst == DevSAM {
-			p.responseCh <- frame
+			b.responseCh <- frame
 		}
 
 		if len(frame.data) > 3 {
-			p.mu.Lock()
-			defer p.mu.Unlock()
-			p.snoops.handle(frame)
+			b.mu.Lock()
+			defer b.mu.Unlock()
+			for _, snoop := range b.snoops {
+				snoop(frame)
+			}
 		}
 	case WriteTableBlock:
 		if frame.src == DevTSTAT && frame.dst == DevSAM {
@@ -116,25 +105,25 @@ func (p *Protocol) handleFrame(frame Frame) *Frame {
 	return nil
 }
 
-func (p *Protocol) reader() {
+func (b *Bus) reader() {
 	defer panic("exiting InfinityProtocol reader, this should never happen")
 
 	msg := []byte{}
 	buf := make([]byte, 1024)
 
 	for {
-		if p.port == nil {
+		if b.port == nil {
 			msg = []byte{}
-			p.openSerial()
+			b.openSerial()
 		}
 
-		n, err := p.port.Read(buf)
+		n, err := b.port.Read(buf)
 		if n == 0 || err != nil {
 			log.Printf("error reading from serial port: %s", err.Error())
-			if p.port != nil {
-				p.port.Close()
+			if b.port != nil {
+				b.port.Close()
 			}
-			p.port = nil
+			b.port = nil
 			continue
 		}
 
@@ -154,8 +143,8 @@ func (p *Protocol) reader() {
 
 			frame := Frame{}
 			if frame.decode(buf) {
-				if response := p.handleFrame(frame); response != nil {
-					p.sendFrame(response.encode())
+				if response := b.handleFrame(frame); response != nil {
+					b.sendFrame(response.encode())
 				}
 
 				// Intentionally didn't do msg = msg[l:] to avoid potential
@@ -169,25 +158,25 @@ func (p *Protocol) reader() {
 	}
 }
 
-func (p *Protocol) broker() {
+func (b *Bus) broker() {
 	defer panic("exiting InfinityProtocol broker, this should never happen")
 
-	for action := range p.actionCh {
-		p.performAction(action)
+	for action := range b.actionCh {
+		b.performAction(action)
 	}
 }
 
-func (p *Protocol) performAction(action *Action) {
+func (b *Bus) performAction(action *Action) {
 	log.Infof("encoded frame: %s", action.requestFrame)
 	encodedFrame := action.requestFrame.encode()
-	p.sendFrame(encodedFrame)
+	b.sendFrame(encodedFrame)
 
 	ticker := time.NewTicker(responseTimeout)
 	defer ticker.Stop()
 
 	for tries := 0; tries < responseRetries; {
 		select {
-		case res := <-p.responseCh:
+		case res := <-b.responseCh:
 			if res.src != action.requestFrame.dst {
 				continue
 			}
@@ -208,7 +197,7 @@ func (p *Protocol) performAction(action *Action) {
 			return
 		case <-ticker.C:
 			log.Debug("timeout waiting for response, retransmitting frame")
-			p.sendFrame(encodedFrame)
+			b.sendFrame(encodedFrame)
 			tries++
 		}
 	}
@@ -217,12 +206,12 @@ func (p *Protocol) performAction(action *Action) {
 	action.ch <- false
 }
 
-func (p *Protocol) send(dst uint16, op uint8, requestData []byte, response interface{}) bool {
+func (b *Bus) send(dst uint16, op uint8, requestData []byte, response interface{}) bool {
 	f := Frame{src: DevSAM, dst: dst, op: op, data: requestData}
 	act := &Action{requestFrame: f, ch: make(chan bool)}
 
 	// Send action to action handling goroutine
-	p.actionCh <- act
+	b.actionCh <- act
 	// Wait for response
 	ok := <-act.ch
 
@@ -242,55 +231,57 @@ func (p *Protocol) send(dst uint16, op uint8, requestData []byte, response inter
 	return ok
 }
 
-func (p *Protocol) Write(dst uint16, table []byte, addr []byte, params interface{}) bool {
+func (b *Bus) Write(dst uint16, table []byte, addr []byte, params interface{}) bool {
 	buf := new(bytes.Buffer)
 	buf.Write(table[:])
 	buf.Write(addr[:])
 	binary.Write(buf, binary.BigEndian, params)
 
-	return p.send(dst, WriteTableBlock, buf.Bytes(), nil)
+	return b.send(dst, WriteTableBlock, buf.Bytes(), nil)
 }
 
-func (p *Protocol) WriteTable(dst uint16, table Table, flags uint8) bool {
+func (b *Bus) WriteTable(dst uint16, table Table, flags uint8) bool {
 	addr := table.addr()
 	fl := []byte{0x00, 0x00, flags}
-	return p.Write(dst, addr[:], fl, table)
+	return b.Write(dst, addr[:], fl, table)
 }
 
-func (p *Protocol) Read(dst uint16, addr TableAddr, params interface{}) bool {
-	return p.send(dst, ReadTableBlock, addr[:], params)
+func (b *Bus) Read(dst uint16, addr TableAddr, params interface{}) bool {
+	return b.send(dst, ReadTableBlock, addr[:], params)
 }
 
-func (p *Protocol) ReadTable(dst uint16, table Table) bool {
+func (b *Bus) ReadTable(dst uint16, table Table) bool {
 	addr := table.addr()
-	return p.send(dst, ReadTableBlock, addr[:], table)
+	return b.send(dst, ReadTableBlock, addr[:], table)
 }
 
-func (p *Protocol) sendFrame(buf []byte) bool {
+func (b *Bus) sendFrame(buf []byte) bool {
 	// Ensure we're not in the middle of reopening the serial port due to an error.
-	if p.port == nil {
+	if b.port == nil {
 		return false
 	}
 
 	log.Debugf("transmitting frame: %x", buf)
-	_, err := p.port.Write(buf)
+	_, err := b.port.Write(buf)
 	if err != nil {
 		log.Errorf("error writing to serial: %s", err.Error())
-		p.port.Close()
-		p.port = nil
+		b.port.Close()
+		b.port = nil
 		return false
 	}
 	return true
 }
 
-func (p *Protocol) SnoopResponse(srcMin uint16, srcMax uint16, cb func(Frame)) {
-	s := protocolSnoop{
-		srcMin: srcMin,
-		srcMax: srcMax,
-		cb:     cb,
-	}
+func (b *Bus) SnoopResponse(f func(Frame)) {
+	b.mu.Lock()
+	b.snoops = append(b.snoops, f)
+	b.mu.Unlock()
+}
 
-	p.mu.Lock()
-	p.snoops = append(p.snoops, s)
-	p.mu.Unlock()
+func filter(p framePredicate, fn frameHandler) frameHandler {
+	return func(f Frame) {
+		if p(f) {
+			fn(f)
+		}
+	}
 }

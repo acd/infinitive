@@ -19,13 +19,13 @@ const (
 
 type Api struct {
 	ctx        context.Context
-	Protocol   *Protocol
+	Bus        *Bus
 	dispatcher *dispatcher.Dispatcher
 	Cache      *cache.Cache
 }
 
 func NewApi(ctx context.Context, device string) (*Api, error) {
-	protocol, err := NewProtocol(device)
+	bus, err := NewBus(device)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +39,7 @@ func NewApi(ctx context.Context, device string) (*Api, error) {
 
 	api := &Api{
 		ctx:        ctx,
-		Protocol:   protocol,
+		Bus:        bus,
 		dispatcher: dispatcher,
 		Cache:      cache,
 	}
@@ -50,7 +50,7 @@ func NewApi(ctx context.Context, device string) (*Api, error) {
 
 func (a *Api) attachSnoops() {
 	// Snoop Heat Pump responses
-	a.Protocol.SnoopResponse(0x5000, 0x51ff, func(frame Frame) {
+	a.Bus.SnoopResponse(filter(sourceRange(0x5000, 0x51ff), func(frame Frame) {
 		if heatPump, ok := a.GetHeatPump(); ok {
 			data := frame.data[3:]
 			if bytes.Equal(frame.data[0:3], []byte{0x00, 0x3e, 0x01}) {
@@ -64,10 +64,10 @@ func (a *Api) attachSnoops() {
 			}
 			a.Cache.Update(heatpumpCacheKey, &heatPump)
 		}
-	})
+	}))
 
 	// Snoop Air Handler responses
-	a.Protocol.SnoopResponse(0x4000, 0x42ff, func(frame Frame) {
+	a.Bus.SnoopResponse(filter(sourceRange(0x4000, 0x42ff), func(frame Frame) {
 		if airHandler, ok := a.GetAirHandler(); ok {
 			data := frame.data[3:]
 			if bytes.Equal(frame.data[0:3], []byte{0x00, 0x03, 0x06}) {
@@ -80,7 +80,7 @@ func (a *Api) attachSnoops() {
 			}
 			a.Cache.Update(blowerCacheKey, &airHandler)
 		}
-	})
+	}))
 }
 
 func (a *Api) poller() {
@@ -128,13 +128,13 @@ type HeatPump struct {
 
 func (a *Api) GetConfig(zone int) (*TStatZoneConfig, bool) {
 	cfg := TStatZoneParams{}
-	ok := a.Protocol.ReadTable(DevTSTAT, &cfg)
+	ok := a.Bus.ReadTable(DevTSTAT, &cfg)
 	if !ok {
 		return nil, false
 	}
 
 	params := TStatCurrentParams{}
-	ok = a.Protocol.ReadTable(DevTSTAT, &params)
+	ok = a.Bus.ReadTable(DevTSTAT, &params)
 	if !ok {
 		return nil, false
 	}
@@ -158,7 +158,7 @@ func (a *Api) GetConfig(zone int) (*TStatZoneConfig, bool) {
 
 func (a *Api) GetTstatSettings() (*TStatSettings, bool) {
 	tss := TStatSettings{}
-	if !a.Protocol.ReadTable(DevTSTAT, &tss) {
+	if !a.Bus.ReadTable(DevTSTAT, &tss) {
 		return nil, false
 	}
 	return &tss, true
@@ -187,14 +187,14 @@ func (a *Api) GetTableRaw(deviceAddr uint16, table []byte) []byte {
 	copy(addr[:], table[0:3])
 	raw := rawRequest{Data: &[]byte{}}
 
-	if a.Protocol.Read(uint16(deviceAddr), addr, raw) {
+	if a.Bus.Read(uint16(deviceAddr), addr, raw) {
 		return *raw.Data
 	}
 	return nil
 }
 
 func (a *Api) UpdateThermostat(table Table, flags uint8) bool {
-	return a.Protocol.WriteTable(DevTSTAT, table, flags)
+	return a.Bus.WriteTable(DevTSTAT, table, flags)
 }
 
 func (a *Api) NewListener() *dispatcher.Listener {
