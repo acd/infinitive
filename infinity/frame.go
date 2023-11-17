@@ -1,4 +1,4 @@
-package main
+package infinity
 
 import (
 	"bytes"
@@ -9,18 +9,18 @@ import (
 )
 
 const (
-	ack02           = uint8(0x02)
-	ack06           = uint8(0x06) //opRESPONSE
-	readTableBlock  = uint8(0x0b) //opREAD
-	writeTableBlock = uint8(0x0c) //opWRITE
-	changeTableName = uint8(0x10)
-	nack            = uint8(0x15) //opERROR
-	alarmPacket     = uint8(0x1e)
-	readObjectData  = uint8(0x22)
-	readVariable    = uint8(0x62)
-	writeVariable   = uint8(0x63)
-	autoVariable    = uint8(0x64)
-	readList        = uint8(0x75)
+	Ack02           = uint8(0x02)
+	Ack06           = uint8(0x06) //opRESPONSE
+	ReadTableBlock  = uint8(0x0b) //opREAD
+	WriteTableBlock = uint8(0x0c) //opWRITE
+	ChangeTableName = uint8(0x10)
+	Nack            = uint8(0x15) //opERROR
+	AlarmPacket     = uint8(0x1e)
+	ReadObjectData  = uint8(0x22)
+	ReadVariable    = uint8(0x62)
+	WriteVariable   = uint8(0x63)
+	AutoVariable    = uint8(0x64)
+	ReadList        = uint8(0x75)
 )
 
 var crcConfig = &crc16.Conf{
@@ -29,7 +29,7 @@ var crcConfig = &crc16.Conf{
 	BigEnd: false,
 }
 
-type InfinityFrame struct {
+type Frame struct {
 	dst     uint16
 	src     uint16
 	dataLen uint8
@@ -37,10 +37,10 @@ type InfinityFrame struct {
 	data    []byte
 }
 
-var writeAck = InfinityFrame{
-	src:  devSAM,
-	dst:  devTSTAT,
-	op:   ack06,
+var writeAck = Frame{
+	src:  DevSAM,
+	dst:  DevTSTAT,
+	op:   Ack06,
 	data: []byte{0x00},
 }
 
@@ -50,48 +50,48 @@ func checksum(b []byte) []byte {
 	return s.Sum(nil)
 }
 
-func (f InfinityFrame) String() string {
-	return fmt.Sprintf("%x -> %x: %-8s %x", f.src, f.dst, f.opString(), f.data)
+func (f Frame) String() string {
+	return fmt.Sprintf("%x -> %x: %-8s %x", f.src, f.dst, opToString(f.op), f.data)
 }
 
-func (f InfinityFrame) Clone() InfinityFrame {
+func (f Frame) Clone() Frame {
 	f.data = append([]byte{}, f.data...)
 	return f
 }
 
-func (f *InfinityFrame) opString() string {
-	switch f.op {
-	case ack02:
+func opToString(op uint8) string {
+	switch op {
+	case Ack02:
 		return "ACK02"
-	case ack06:
+	case Ack06:
 		return "ACK06"
-	case readTableBlock:
+	case ReadTableBlock:
 		return "READ"
-	case writeTableBlock:
+	case WriteTableBlock:
 		return "WRITE"
-	case changeTableName:
+	case ChangeTableName:
 		return "CHGTBN"
-	case nack:
+	case Nack:
 		return "NACK"
-	case alarmPacket:
+	case AlarmPacket:
 		return "ALARM"
-	case readObjectData:
+	case ReadObjectData:
 		return "OBJRD"
-	case readVariable:
+	case ReadVariable:
 		return "RDVAR"
-	case writeVariable:
+	case WriteVariable:
 		return "FORCE"
-	case autoVariable:
+	case AutoVariable:
 		return "AUTO"
-	case readList:
+	case ReadList:
 		return "LIST"
 
 	default:
-		return fmt.Sprintf("UNKNOWN(%x)", f.op)
+		return fmt.Sprintf("UNKNOWN(%x)", op)
 	}
 }
 
-func (frame *InfinityFrame) encode() []byte {
+func (frame *Frame) encode() []byte {
 	// b := make([]byte, 10 + len(frame.data))
 	if len(frame.data) > 255 {
 		panic("frame data too large")
@@ -112,7 +112,7 @@ func (frame *InfinityFrame) encode() []byte {
 	return b.Bytes()
 }
 
-func (f *InfinityFrame) decode(buf []byte) bool {
+func (f *Frame) decode(buf []byte) bool {
 	nonzero := false
 	for _, c := range buf {
 		if c != 0 {

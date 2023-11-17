@@ -1,6 +1,6 @@
-package main
+package infinity
 
-func rawModeToString(mode uint8) string {
+func RawModeToString(mode uint8) string {
 	switch mode {
 	case 0:
 		return "heat" // heat source: "system in control"
@@ -20,7 +20,7 @@ func rawModeToString(mode uint8) string {
 	}
 }
 
-func stringModeToRaw(mode string) uint8 {
+func StringModeToRaw(mode string) uint8 {
 	switch mode {
 	case "heat":
 		return 0
@@ -35,7 +35,7 @@ func stringModeToRaw(mode string) uint8 {
 	}
 }
 
-func rawFanModeToString(mode uint8) string {
+func RawFanModeToString(mode uint8) string {
 	switch mode {
 	case 0:
 		return "auto"
@@ -50,7 +50,7 @@ func rawFanModeToString(mode uint8) string {
 	}
 }
 
-func stringFanModeToRaw(mode string) (uint8, bool) {
+func StringFanModeToRaw(mode string) (uint8, bool) {
 	switch mode {
 	case "auto":
 		return 0, true

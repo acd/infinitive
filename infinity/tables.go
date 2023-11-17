@@ -1,13 +1,13 @@
-package main
+package infinity
 
 import (
 	"fmt"
 	"reflect"
 )
 
-type InfinityTableAddr [3]byte
-type InfinityTable interface {
-	addr() InfinityTableAddr
+type TableAddr [3]byte
+type Table interface {
+	addr() TableAddr
 }
 
 type TStatCurrentParams struct {
@@ -35,8 +35,8 @@ type TStatCurrentParams struct {
 	DisplayedZone     uint8
 }
 
-func (params TStatCurrentParams) addr() InfinityTableAddr {
-	return InfinityTableAddr{0x00, 0x3B, 0x02}
+func (params TStatCurrentParams) addr() TableAddr {
+	return TableAddr{0x00, 0x3B, 0x02}
 }
 
 type TStatZoneParams struct {
@@ -93,11 +93,11 @@ type TStatZoneParams struct {
 	Z8Name           [12]byte
 }
 
-func (params TStatZoneParams) addr() InfinityTableAddr {
-	return InfinityTableAddr{0x00, 0x3B, 0x03}
+func (params TStatZoneParams) addr() TableAddr {
+	return TableAddr{0x00, 0x3B, 0x03}
 }
 
-func (params *TStatZoneParams) setZonalField(zone int, fieldName string, value uint8) bool {
+func (params *TStatZoneParams) SetZonalField(zone int, fieldName string, value uint8) bool {
 	fieldName = fmt.Sprintf("Z%d%s", zone, fieldName)
 
 	v := reflect.ValueOf(params).Elem()
@@ -111,7 +111,7 @@ func (params *TStatZoneParams) setZonalField(zone int, fieldName string, value u
 	return false
 }
 
-func (params *TStatZoneParams) getZonalField(zone int, fieldName string) any {
+func (params *TStatZoneParams) GetZonalField(zone int, fieldName string) any {
 	return getZonalField(params, zone, fieldName)
 }
 
@@ -127,7 +127,7 @@ func getZonalField(s any, zone int, fieldName string) any {
 	return nil
 }
 
-func (params *TStatCurrentParams) getZonalField(zone int, fieldName string) any {
+func (params *TStatCurrentParams) GetZonalField(zone int, fieldName string) any {
 	return getZonalField(params, zone, fieldName)
 }
 
@@ -141,8 +141,8 @@ type TStatVacationParams struct {
 	FanMode        uint8 // matches fan mode from TStatZoneParams
 }
 
-func (params TStatVacationParams) addr() InfinityTableAddr {
-	return InfinityTableAddr{0x00, 0x3B, 0x04}
+func (params TStatVacationParams) addr() TableAddr {
+	return TableAddr{0x00, 0x3B, 0x04}
 }
 
 type APIVacationConfig struct {
@@ -155,7 +155,7 @@ type APIVacationConfig struct {
 	FanMode        *string `json:"fanMode"`
 }
 
-func (params TStatVacationParams) toAPI() APIVacationConfig {
+func (params TStatVacationParams) ToAPI() APIVacationConfig {
 	api := APIVacationConfig{MinTemperature: &params.MinTemperature,
 		MaxTemperature: &params.MaxTemperature,
 		MinHumidity:    &params.MinHumidity,
@@ -167,13 +167,13 @@ func (params TStatVacationParams) toAPI() APIVacationConfig {
 	days := uint8(params.Hours / 7)
 	api.Days = &days
 
-	mode := rawFanModeToString(params.FanMode)
+	mode := RawFanModeToString(params.FanMode)
 	api.FanMode = &mode
 
 	return api
 }
 
-func (params *TStatVacationParams) fromAPI(config *APIVacationConfig) byte {
+func (params *TStatVacationParams) FromAPI(config *APIVacationConfig) byte {
 	flags := byte(0)
 
 	if config.Days != nil {
@@ -202,7 +202,7 @@ func (params *TStatVacationParams) fromAPI(config *APIVacationConfig) byte {
 	}
 
 	if config.FanMode != nil {
-		mode, _ := stringFanModeToRaw(*config.FanMode)
+		mode, _ := StringFanModeToRaw(*config.FanMode)
 		// FIXME: check for ok here
 		params.FanMode = mode
 		flags |= 0x40
@@ -225,6 +225,6 @@ type TStatSettings struct {
 	DealerPhone      [20]byte
 }
 
-func (params TStatSettings) addr() InfinityTableAddr {
-	return InfinityTableAddr{0x00, 0x3B, 0x06}
+func (params TStatSettings) addr() TableAddr {
+	return TableAddr{0x00, 0x3B, 0x06}
 }

@@ -1,4 +1,4 @@
-package main
+package infinity
 
 import (
 	"bytes"
@@ -11,46 +11,60 @@ import (
 )
 
 const (
-	devTSTAT = uint16(0x2001)
-	devSAM   = uint16(0x9201)
+	DevTSTAT = uint16(0x2001)
+	DevSAM   = uint16(0x9201)
 )
 
 const responseTimeout = 200 * time.Millisecond
 const responseRetries = 5
 
-type snoopCallback func(InfinityFrame)
-
-type InfinityProtocolRawRequest struct {
-	data *[]byte
+type rawRequest struct {
+	Data *[]byte
 }
 
-type InfinityProtocolSnoop struct {
+type protocolSnoop struct {
 	srcMin uint16
 	srcMax uint16
-	cb     snoopCallback
+	cb     func(Frame)
 }
 
-type SnoopList []InfinityProtocolSnoop
+type snoopList []protocolSnoop
 
-type InfinityProtocol struct {
-	device     string
-	port       *serial.Port
-	responseCh chan InfinityFrame
-	actionCh   chan *Action
-	snoops     SnoopList
-	mu         sync.Mutex
+type Protocol struct {
+	device      string
+	readTimeout time.Duration
+	port        *serial.Port
+	responseCh  chan Frame
+	actionCh    chan *Action
+	snoops      snoopList
+	mu          sync.Mutex
+}
+
+func NewProtocol(device string) (*Protocol, error) {
+	p := &Protocol{
+		device:      device,
+		readTimeout: time.Second * 5,
+		responseCh:  make(chan Frame, 32),
+		actionCh:    make(chan *Action),
+	}
+	if err := p.openSerial(); err != nil {
+		return nil, err
+	}
+
+	go p.reader()
+	go p.broker()
+
+	return p, nil
 }
 
 type Action struct {
-	requestFrame  InfinityFrame
-	responseFrame *InfinityFrame
+	requestFrame  Frame
+	responseFrame *Frame
 	ok            bool
 	ch            chan bool
 }
 
-var readTimeout = time.Second * 5
-
-func (l SnoopList) handle(frame InfinityFrame) {
+func (l snoopList) handle(frame Frame) {
 	for _, s := range l {
 		if frame.src >= s.srcMin && frame.src <= s.srcMax {
 			s.cb(frame.Clone())
@@ -58,13 +72,18 @@ func (l SnoopList) handle(frame InfinityFrame) {
 	}
 }
 
-func (p *InfinityProtocol) openSerial() error {
+func (p *Protocol) openSerial() error {
 	log.Printf("opening serial interface: %s", p.device)
 	if p.port != nil {
 		p.port.Close()
+		p.port = nil
 	}
 
-	c := &serial.Config{Name: p.device, Baud: 38400, ReadTimeout: readTimeout}
+	c := &serial.Config{
+		Name:        p.device,
+		Baud:        38400,
+		ReadTimeout: p.readTimeout,
+	}
 	var err error
 	p.port, err = serial.OpenPort(c)
 	if err != nil {
@@ -74,27 +93,12 @@ func (p *InfinityProtocol) openSerial() error {
 	return nil
 }
 
-func (p *InfinityProtocol) Open() error {
-	err := p.openSerial()
-	if err != nil {
-		return err
-	}
-
-	p.responseCh = make(chan InfinityFrame, 32)
-	p.actionCh = make(chan *Action)
-
-	go p.reader()
-	go p.broker()
-
-	return nil
-}
-
-func (p *InfinityProtocol) handleFrame(frame InfinityFrame) *InfinityFrame {
-	// log.Printf("read frame: %s", frame)
+func (p *Protocol) handleFrame(frame Frame) *Frame {
+	log.Printf("read frame: %s", frame)
 
 	switch frame.op {
-	case ack06:
-		if frame.dst == devSAM {
+	case Ack06:
+		if frame.dst == DevSAM {
 			p.responseCh <- frame
 		}
 
@@ -103,8 +107,8 @@ func (p *InfinityProtocol) handleFrame(frame InfinityFrame) *InfinityFrame {
 			defer p.mu.Unlock()
 			p.snoops.handle(frame)
 		}
-	case writeTableBlock:
-		if frame.src == devTSTAT && frame.dst == devSAM {
+	case WriteTableBlock:
+		if frame.src == DevTSTAT && frame.dst == DevSAM {
 			return &writeAck
 		}
 	}
@@ -112,7 +116,7 @@ func (p *InfinityProtocol) handleFrame(frame InfinityFrame) *InfinityFrame {
 	return nil
 }
 
-func (p *InfinityProtocol) reader() {
+func (p *Protocol) reader() {
 	defer panic("exiting InfinityProtocol reader, this should never happen")
 
 	msg := []byte{}
@@ -148,7 +152,7 @@ func (p *InfinityProtocol) reader() {
 			}
 			buf := msg[:l]
 
-			frame := InfinityFrame{}
+			frame := Frame{}
 			if frame.decode(buf) {
 				if response := p.handleFrame(frame); response != nil {
 					p.sendFrame(response.encode())
@@ -165,7 +169,7 @@ func (p *InfinityProtocol) reader() {
 	}
 }
 
-func (p *InfinityProtocol) broker() {
+func (p *Protocol) broker() {
 	defer panic("exiting InfinityProtocol broker, this should never happen")
 
 	for action := range p.actionCh {
@@ -173,7 +177,7 @@ func (p *InfinityProtocol) broker() {
 	}
 }
 
-func (p *InfinityProtocol) performAction(action *Action) {
+func (p *Protocol) performAction(action *Action) {
 	log.Infof("encoded frame: %s", action.requestFrame)
 	encodedFrame := action.requestFrame.encode()
 	p.sendFrame(encodedFrame)
@@ -191,7 +195,7 @@ func (p *InfinityProtocol) performAction(action *Action) {
 			reqTable := action.requestFrame.data[0:3]
 			resTable := res.data[0:3]
 
-			if action.requestFrame.op == readTableBlock && !bytes.Equal(reqTable, resTable) {
+			if action.requestFrame.op == ReadTableBlock && !bytes.Equal(reqTable, resTable) {
 				log.Printf("got response for incorrect table, is: %x expected: %x", resTable, reqTable)
 				continue
 			}
@@ -213,8 +217,8 @@ func (p *InfinityProtocol) performAction(action *Action) {
 	action.ch <- false
 }
 
-func (p *InfinityProtocol) send(dst uint16, op uint8, requestData []byte, response interface{}) bool {
-	f := InfinityFrame{src: devSAM, dst: dst, op: op, data: requestData}
+func (p *Protocol) send(dst uint16, op uint8, requestData []byte, response interface{}) bool {
+	f := Frame{src: DevSAM, dst: dst, op: op, data: requestData}
 	act := &Action{requestFrame: f, ch: make(chan bool)}
 
 	// Send action to action handling goroutine
@@ -222,12 +226,12 @@ func (p *InfinityProtocol) send(dst uint16, op uint8, requestData []byte, respon
 	// Wait for response
 	ok := <-act.ch
 
-	if ok && op == readTableBlock && act.responseFrame != nil && act.responseFrame.data != nil && len(act.responseFrame.data) > 6 {
-		raw, ok := response.(InfinityProtocolRawRequest)
+	if ok && op == ReadTableBlock && act.responseFrame != nil && act.responseFrame.data != nil && len(act.responseFrame.data) > 6 {
+		raw, ok := response.(rawRequest)
 		if ok {
 			log.Printf(">>>> handling a RawRequest")
-			*raw.data = append(*raw.data, act.responseFrame.data[6:]...)
-			log.Printf("raw data length is: %d", len(*raw.data))
+			*raw.Data = append(*raw.Data, act.responseFrame.data[6:]...)
+			log.Printf("raw data length is: %d", len(*raw.Data))
 		} else {
 			r := bytes.NewReader(act.responseFrame.data[6:])
 			binary.Read(r, binary.BigEndian, response)
@@ -238,37 +242,37 @@ func (p *InfinityProtocol) send(dst uint16, op uint8, requestData []byte, respon
 	return ok
 }
 
-func (p *InfinityProtocol) Write(dst uint16, table []byte, addr []byte, params interface{}) bool {
+func (p *Protocol) Write(dst uint16, table []byte, addr []byte, params interface{}) bool {
 	buf := new(bytes.Buffer)
 	buf.Write(table[:])
 	buf.Write(addr[:])
 	binary.Write(buf, binary.BigEndian, params)
 
-	return p.send(dst, writeTableBlock, buf.Bytes(), nil)
+	return p.send(dst, WriteTableBlock, buf.Bytes(), nil)
 }
 
-func (p *InfinityProtocol) WriteTable(dst uint16, table InfinityTable, flags uint8) bool {
+func (p *Protocol) WriteTable(dst uint16, table Table, flags uint8) bool {
 	addr := table.addr()
 	fl := []byte{0x00, 0x00, flags}
 	return p.Write(dst, addr[:], fl, table)
 }
 
-func (p *InfinityProtocol) Read(dst uint16, addr InfinityTableAddr, params interface{}) bool {
-	return p.send(dst, readTableBlock, addr[:], params)
+func (p *Protocol) Read(dst uint16, addr TableAddr, params interface{}) bool {
+	return p.send(dst, ReadTableBlock, addr[:], params)
 }
 
-func (p *InfinityProtocol) ReadTable(dst uint16, table InfinityTable) bool {
+func (p *Protocol) ReadTable(dst uint16, table Table) bool {
 	addr := table.addr()
-	return p.send(dst, readTableBlock, addr[:], table)
+	return p.send(dst, ReadTableBlock, addr[:], table)
 }
 
-func (p *InfinityProtocol) sendFrame(buf []byte) bool {
+func (p *Protocol) sendFrame(buf []byte) bool {
 	// Ensure we're not in the middle of reopening the serial port due to an error.
 	if p.port == nil {
 		return false
 	}
 
-	// log.Debugf("transmitting frame: %x", buf)
+	log.Debugf("transmitting frame: %x", buf)
 	_, err := p.port.Write(buf)
 	if err != nil {
 		log.Errorf("error writing to serial: %s", err.Error())
@@ -279,8 +283,13 @@ func (p *InfinityProtocol) sendFrame(buf []byte) bool {
 	return true
 }
 
-func (p *InfinityProtocol) snoopResponse(srcMin uint16, srcMax uint16, cb snoopCallback) {
-	s := InfinityProtocolSnoop{srcMin: srcMin, srcMax: srcMax, cb: cb}
+func (p *Protocol) SnoopResponse(srcMin uint16, srcMax uint16, cb func(Frame)) {
+	s := protocolSnoop{
+		srcMin: srcMin,
+		srcMax: srcMax,
+		cb:     cb,
+	}
+
 	p.mu.Lock()
 	p.snoops = append(p.snoops, s)
 	p.mu.Unlock()

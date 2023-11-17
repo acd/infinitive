@@ -1,27 +1,28 @@
 package dispatcher
 
-import (
-	"encoding/json"
-)
-
 type Listener struct {
-	ch chan []byte
+	ch        chan *Event
+	closeFunc func()
 }
 
-func (l *Listener) Receive() <-chan []byte {
+func (l *Listener) Receive() <-chan *Event {
 	return l.ch
+}
+
+func (l *Listener) Close() {
+	l.closeFunc()
 }
 
 type Dispatcher struct {
 	listeners    map[*Listener]bool
-	broadcast    chan []byte
+	broadcast    chan *Event
 	registerCh   chan *Listener
 	deregisterCh chan *Listener
 }
 
 func New() *Dispatcher {
 	d := &Dispatcher{
-		broadcast:    make(chan []byte, 64),
+		broadcast:    make(chan *Event, 64),
 		registerCh:   make(chan *Listener),
 		deregisterCh: make(chan *Listener),
 		listeners:    make(map[*Listener]bool),
@@ -30,28 +31,25 @@ func New() *Dispatcher {
 	return d
 }
 
-type broadcastEvent struct {
-	Source string      `json:"source"`
-	Data   interface{} `json:"data"`
-}
-
-func SerializeEvent(source string, data interface{}) []byte {
-	msg, _ := json.Marshal(&broadcastEvent{Source: source, Data: data})
-	return msg
+type Event struct {
+	Source string
+	Data   interface{}
 }
 
 func (d *Dispatcher) NewListener() *Listener {
-	l := &Listener{make(chan []byte, 32)}
+	l := &Listener{
+		ch: make(chan *Event, 32),
+	}
+	l.closeFunc = func() {
+		d.deregisterCh <- l
+	}
+
 	d.registerCh <- l
 	return l
 }
 
-func (d *Dispatcher) Deregister(l *Listener) {
-	d.deregisterCh <- l
-}
-
 func (d *Dispatcher) BroadcastEvent(source string, data interface{}) {
-	d.broadcast <- SerializeEvent(source, data)
+	d.broadcast <- &Event{source, data}
 }
 
 func (h *Dispatcher) run() {
