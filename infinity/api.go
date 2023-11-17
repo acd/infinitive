@@ -30,7 +30,7 @@ func NewApi(ctx context.Context, device string) (*Api, error) {
 		return nil, err
 	}
 
-	dispatcher := dispatcher.New()
+	dispatcher := dispatcher.New(ctx)
 
 	cache := cache.New(dispatcher.BroadcastEvent)
 	// Set default values for structs the UI cares about

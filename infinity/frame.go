@@ -59,34 +59,25 @@ func (f Frame) Clone() Frame {
 	return f
 }
 
-func opToString(op uint8) string {
-	switch op {
-	case Ack02:
-		return "ACK02"
-	case Ack06:
-		return "ACK06"
-	case ReadTableBlock:
-		return "READ"
-	case WriteTableBlock:
-		return "WRITE"
-	case ChangeTableName:
-		return "CHGTBN"
-	case Nack:
-		return "NACK"
-	case AlarmPacket:
-		return "ALARM"
-	case ReadObjectData:
-		return "OBJRD"
-	case ReadVariable:
-		return "RDVAR"
-	case WriteVariable:
-		return "FORCE"
-	case AutoVariable:
-		return "AUTO"
-	case ReadList:
-		return "LIST"
+var opsToString = [256]string{
+	Ack02:           "ACK02",
+	Ack06:           "ACK06",
+	ReadTableBlock:  "READ",
+	WriteTableBlock: "WRITE",
+	ChangeTableName: "CHGTBN",
+	Nack:            "NACK",
+	AlarmPacket:     "ALARM",
+	ReadObjectData:  "OBJRD",
+	ReadVariable:    "RDVAR",
+	WriteVariable:   "FORCE",
+	AutoVariable:    "AUTO",
+	ReadList:        "LIST",
+}
 
-	default:
+func opToString(op uint8) string {
+	if s := opsToString[op]; s != "" {
+		return s
+	} else {
 		return fmt.Sprintf("UNKNOWN(%x)", op)
 	}
 }

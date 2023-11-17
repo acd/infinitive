@@ -76,19 +76,25 @@ func (ws *webserver) buildEngine() *gin.Engine {
 		}
 	})
 
-	api.GET("/zone/1/airhandler", func(c *gin.Context) {
+	getAirHandler := func(c *gin.Context) {
 		ah, ok := ws.api.GetAirHandler()
 		if ok {
 			c.JSON(200, ah)
 		}
-	})
+	}
 
-	api.GET("/zone/1/heatpump", func(c *gin.Context) {
+	getHeatPump := func(c *gin.Context) {
 		hp, ok := ws.api.GetHeatPump()
 		if ok {
 			c.JSON(200, hp)
 		}
-	})
+	}
+
+	api.GET("/airhandler", getAirHandler)
+	api.GET("/heatpump", getHeatPump)
+	// The routes below are for backward compatibility
+	api.GET("/zone/1/airhandler", getAirHandler)
+	api.GET("/zone/1/heatpump", getHeatPump)
 
 	api.GET("/zone/1/vacation", func(c *gin.Context) {
 		vac := infinity.TStatVacationParams{}
@@ -222,10 +228,9 @@ func (ws *webserver) websocketListener(wsConn *websocket.Conn) {
 
 	defer func() {
 		listener.Close()
-		log.Printf("closing websocket")
-		err := wsConn.Close()
-		if err != nil {
-			log.Errorf("error on closing wsConn: %v", err)
+		log.Infof("%s: closing websocket", wsConn.RemoteAddr())
+		if err := wsConn.Close(); err != nil {
+			log.Errorf("%s: error on closing wsConn: %v", wsConn.RemoteAddr(), err)
 		}
 	}()
 
@@ -236,7 +241,7 @@ func (ws *webserver) websocketListener(wsConn *websocket.Conn) {
 	// wait for events
 	for message := range listener.Receive() {
 		if _, err := wsConn.Write(serializeUpdate(message.Source, message.Data)); err != nil {
-			log.Printf("error writing to wsConn: %v", err)
+			log.Infof("%s: error writing to wsConn: %v", wsConn.RemoteAddr(), err)
 			return
 		}
 	}

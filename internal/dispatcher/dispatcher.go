@@ -1,5 +1,7 @@
 package dispatcher
 
+import "context"
+
 type Listener struct {
 	ch        chan *Event
 	closeFunc func()
@@ -14,18 +16,20 @@ func (l *Listener) Close() {
 }
 
 type Dispatcher struct {
-	listeners    map[*Listener]bool
+	ctx          context.Context
+	listeners    map[*Listener]struct{}
 	broadcast    chan *Event
 	registerCh   chan *Listener
 	deregisterCh chan *Listener
 }
 
-func New() *Dispatcher {
+func New(ctx context.Context) *Dispatcher {
 	d := &Dispatcher{
+		ctx:          ctx,
 		broadcast:    make(chan *Event, 64),
 		registerCh:   make(chan *Listener),
 		deregisterCh: make(chan *Listener),
-		listeners:    make(map[*Listener]bool),
+		listeners:    make(map[*Listener]struct{}),
 	}
 	go d.run()
 	return d
@@ -33,7 +37,7 @@ func New() *Dispatcher {
 
 type Event struct {
 	Source string
-	Data   interface{}
+	Data   any
 }
 
 func (d *Dispatcher) NewListener() *Listener {
@@ -48,29 +52,31 @@ func (d *Dispatcher) NewListener() *Listener {
 	return l
 }
 
-func (d *Dispatcher) BroadcastEvent(source string, data interface{}) {
+func (d *Dispatcher) BroadcastEvent(source string, data any) {
 	d.broadcast <- &Event{source, data}
 }
 
-func (h *Dispatcher) run() {
+func (d *Dispatcher) run() {
 	for {
 		select {
-		case listener := <-h.registerCh:
-			h.listeners[listener] = true
-		case listener := <-h.deregisterCh:
-			if _, ok := h.listeners[listener]; ok {
-				delete(h.listeners, listener)
+		case listener := <-d.registerCh:
+			d.listeners[listener] = struct{}{}
+		case listener := <-d.deregisterCh:
+			if _, ok := d.listeners[listener]; ok {
+				delete(d.listeners, listener)
 				close(listener.ch)
 			}
-		case message := <-h.broadcast:
-			for listener := range h.listeners {
+		case message := <-d.broadcast:
+			for listener := range d.listeners {
 				select {
 				case listener.ch <- message:
 				default:
 					close(listener.ch)
-					delete(h.listeners, listener)
+					delete(d.listeners, listener)
 				}
 			}
+		case <-d.ctx.Done():
+			return
 		}
 	}
 }
